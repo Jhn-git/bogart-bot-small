@@ -17,7 +17,35 @@ COPY . .
 # Build the TypeScript code
 RUN npm run build
 
-# Stage 2: Production stage
+# Stage 2: Development stage
+FROM node:18-alpine AS development
+
+# Set working directory
+WORKDIR /app
+
+# Copy package files
+COPY package*.json ./
+
+# Install all dependencies (including dev dependencies)
+RUN npm ci
+
+# Copy source code and configuration
+COPY . .
+
+# Create directories for logs and data
+RUN mkdir -p /app/logs /app/data
+
+# Expose port for development
+EXPOSE 3000
+
+# Set environment variables for development
+ENV NODE_ENV=development
+ENV QUOTES_FILE=/app/data/quotes.yaml
+
+# Start the development server
+CMD ["npm", "run", "dev"]
+
+# Stage 3: Production stage
 FROM node:18-alpine AS production
 
 # Add metadata
@@ -43,10 +71,10 @@ RUN npm ci --only=production --no-cache && \
 COPY --from=builder /app/dist ./dist
 
 # Copy necessary runtime files
-COPY --chown=bogart:nodejs quotes.yaml ./
+COPY --chown=bogart:nodejs data/quotes.yaml ./data/
 
-# Create directory for logs and ensure proper permissions
-RUN mkdir -p /app/logs && \
+# Create directories for logs and data, ensure proper permissions
+RUN mkdir -p /app/logs /app/data && \
     chown -R bogart:nodejs /app
 
 # Switch to non-root user
@@ -61,7 +89,7 @@ EXPOSE 3000
 
 # Set environment variables
 ENV NODE_ENV=production
-ENV QUOTES_FILE=/app/quotes.yaml
+ENV QUOTES_FILE=/app/data/quotes.yaml
 
 # Start the application
 CMD ["node", "dist/main.js"]

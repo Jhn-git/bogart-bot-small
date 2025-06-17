@@ -211,7 +211,7 @@ backup_config() {
     
     tar -czf "$backup_dir/$backup_file" \
         .env \
-        quotes.yaml \
+        data/quotes.yaml \
         docker-compose*.yml \
         Dockerfile \
         .dockerignore \

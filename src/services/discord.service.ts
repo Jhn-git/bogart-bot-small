@@ -49,7 +49,3 @@ export class DiscordService {
     return this.client;
   }
 }
-
-import configService from './config.service';
-
-export const discordService = new DiscordService(configService);

@@ -2,6 +2,9 @@ import { ConfigService } from '../config.service';
 import fs from 'fs';
 import { dump } from 'js-yaml';
 
+// Since we are now mocking the service globally, we need to test the original implementation
+jest.unmock('../config.service');
+
 describe('ConfigService', () => {
   const originalEnv = process.env;
 

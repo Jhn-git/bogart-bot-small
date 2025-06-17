@@ -8,10 +8,10 @@
  * - Error handling scenarios
  */
 
-import { ConfigService } from '../services/config.service';
-import { DiscordService } from '../services/discord.service';
-import { QuoteService } from '../services/quote.service';
-import { WanderingService } from '../services/wandering.service';
+import { ConfigService } from '../../src/services/config.service';
+import { DiscordService } from '../../src/services/discord.service';
+import { QuoteService } from '../../src/services/quote.service';
+import { WanderingService } from '../../src/services/wandering.service';
 import fs from 'fs';
 import yaml from 'js-yaml';
 
@@ -37,7 +37,7 @@ describe('System Integration Tests', () => {
     // Set up test environment variables
     process.env.DISCORD_TOKEN = 'test_token';
     process.env.GUILD_ID = 'test_guild';
-    process.env.QUOTES_FILE = 'quotes.yaml';
+    process.env.QUOTES_FILE = 'data/quotes.yaml';
   });
 
   afterEach(() => {
@@ -190,7 +190,7 @@ describe('System Integration Tests', () => {
 
     it('should validate quotes.yaml structure', () => {
       // Verify the actual quotes.yaml file structure
-      const quotesContent = fs.readFileSync('quotes.yaml', 'utf8');
+      const quotesContent = fs.readFileSync('data/quotes.yaml', 'utf8');
       const quotes = yaml.load(quotesContent) as any;
       
       expect(quotes).toBeDefined();

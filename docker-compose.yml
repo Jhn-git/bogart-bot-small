@@ -1,0 +1,90 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/compose-spec/compose-spec/master/schema/compose-spec.json
+
+x-base-service: &base-service
+  image: bogart-bot:latest
+  restart: unless-stopped
+  env_file:
+    - .env
+  volumes:
+    - ./data/quotes.yaml:/app/data/quotes.yaml:ro
+    - /etc/localtime:/etc/localtime:ro
+  security_opt:
+    - no-new-privileges:true
+  cap_drop:
+    - ALL
+  cap_add:
+    - SETGID
+    - SETUID
+  read_only: true
+  tmpfs:
+    - /tmp:rw,noexec,nosuid,size=100m
+
+services:
+  bogart-bot:
+    <<: *base-service
+    container_name: bogart-bot-prod
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: production
+    environment:
+      - NODE_ENV=production
+      - LOG_LEVEL=info
+      - ENABLE_METRICS=true
+    volumes:
+      - ./data/quotes.yaml:/app/data/quotes.yaml:ro
+      - bogart-prod-logs:/app/logs
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 1G
+        reservations:
+          cpus: '0.2'
+          memory: 256M
+    healthcheck:
+      test: ["CMD", "node", "scripts/validate-system.js"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 90s
+    networks:
+      - bogart-prod-network
+
+  bogart-bot-dev:
+    <<: *base-service
+    container_name: bogart-bot-dev
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: builder
+    command: npm run dev
+    environment:
+      - NODE_ENV=development
+      - LOG_LEVEL=debug
+      - DEBUG=*
+    volumes:
+      - ./src:/app/src:ro
+      - ./data/quotes.yaml:/app/data/quotes.yaml:ro
+      - ./package.json:/app/package.json:ro
+      - ./package-lock.json:/app/package-lock.json:ro
+      - ./tsconfig.json:/app/tsconfig.json:ro
+      - bogart-dev-logs:/app/logs
+      - /app/node_modules
+    read_only: false
+    stdin_open: true
+    tty: true
+    networks:
+      - bogart-dev-network
+
+volumes:
+  bogart-prod-logs:
+    driver: local
+  bogart-dev-logs:
+    driver: local
+
+networks:
+  bogart-prod-network:
+    driver: bridge
+  bogart-dev-network:
+    driver: bridge

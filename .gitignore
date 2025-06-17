@@ -96,3 +96,11 @@ coverage/
 
 # DynamoDB Local files
 .dynamodb/
+
+# Docker
+docker-compose.override.yml
+.docker/
+*.log
+
+# Deployment backups
+backups/

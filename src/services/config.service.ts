@@ -9,7 +9,7 @@ export class ConfigService {
   constructor() {
     dotenv.config();
 
-    const quotesPath = process.env.QUOTES_FILE || 'quotes.yaml';
+    const quotesPath = process.env.QUOTES_FILE || 'data/quotes.yaml';
     const quotesFile = fs.readFileSync(quotesPath, 'utf8');
     const quotes = yaml.load(quotesFile) as Quotes;
 
@@ -28,6 +28,3 @@ export class ConfigService {
     return this.config[key];
   }
 }
-
-const configService = new ConfigService();
-export default configService;

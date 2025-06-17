@@ -45,7 +45,3 @@ export class QuoteService {
     return message;
   }
 }
-
-import configService from './config.service';
-
-export const quoteService = new QuoteService(configService);

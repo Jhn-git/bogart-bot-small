@@ -247,5 +247,28 @@ describe('MessageCleanupService', () => {
         expect(userMessage.delete).not.toHaveBeenCalled();
         expect(botMessage.delete).toHaveBeenCalledTimes(1);
     });
+it('should respect the cleanupMaxMessages limit from ConfigService', async () => {
+      const maxMessages = 50;
+      (mockConfigService.get as jest.Mock).mockReturnValue(maxMessages);
+
+      const channel = createMockChannel('channel-1', 'limit-test', mockGuild);
+      const messages = Array.from({ length: 100 }, (_, i) =>
+        createMockMessage(`msg-${i}`, BOT_USER_ID, Date.now() - 1000 * i, channel)
+      );
+
+      // Mock fetch to return messages in batches
+      channel.messages.fetch = jest.fn()
+        .mockResolvedValueOnce(new Collection(messages.slice(0, 50).map(m => [m.id, m])))
+        .mockResolvedValueOnce(new Collection(messages.slice(50, 100).map(m => [m.id, m])))
+        .mockResolvedValue(new Collection());
+
+      mockGuild.channels.cache.set(channel.id, channel);
+
+      const options: MessageCleanupOptions = { dryRun: true, hours: 48, batchSize: 50 };
+      const result = await service.cleanupMessages(options);
+
+      expect(result.scanned).toBe(maxMessages);
+      expect(channel.messages.fetch).toHaveBeenCalledTimes(1);
+    });
   });
 });

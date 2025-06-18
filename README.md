@@ -168,6 +168,7 @@ npm run test:coverage
 | `LOG_LEVEL` | The logging level. | `info` | ❌ |
 | `NODE_ENV` | The runtime environment. | `production` | ❌ |
 | `CLEANUP_MODE` | If `true`, runs the message cleanup on startup. | `false` | ❌ |
+| `CLEANUP_MAX_MESSAGES_PER_CHANNEL` | The maximum number of recent messages to scan per channel. | `100` | ❌ |
 
 ### Quotes
 
@@ -194,17 +195,19 @@ goblin_wandering_messages:
 
 ## Emergency Message Cleanup
 
-An emergency cleanup system is available to remove messages sent by Bogart after the mass-messaging incident. This tool is designed with multiple safeguards to prevent accidental data loss and should be used with care.
+An emergency cleanup system is available to remove messages sent by Bogart. To enhance privacy and performance, the cleanup process now scans a limited number of recent messages per channel (default 100) instead of the entire channel history. This change significantly reduces Discord API usage and ensures the bot only accesses recent message history.
 
 ### How It Works
 
-The cleanup service scans all channels the bot can access and deletes messages that meet the following criteria:
+The cleanup service scans a limited history of channels the bot can access and deletes messages that meet the following criteria:
 1.  **Author**: Only messages sent by Bogart are targeted.
-2.  **Timeframe**: Only messages sent within the last 48 hours (configurable) are considered.
-3.  **Permissions**: The bot must have the `Manage Messages` permission in the channel.
+2.  **Timeframe**: Only messages sent within the last 48 hours (configurable via `--hours`) are considered.
+3.  **Message Scan Limit**: By default, only the last **100 messages** per channel are scanned. This is configurable via `MessageCleanupOptions` or the `CLEANUP_MAX_MESSAGES_PER_CHANNEL` environment variable.
+4.  **Permissions**: The bot must have `Manage Messages` permission in the channel.
 
 ### Safety First: Built-in Safeguards
 
+-   **Limited Scope**: Protects user privacy by scanning only a small, recent portion of channel history (default 100 messages).
 -   **Targeted Deletion**: The script **only** targets messages sent by the bot itself.
 -   **Default Dry-Run**: By default, the script runs in "dry-run" mode, showing what *would* be deleted without actually deleting anything.
 -   **Confirmation Required**: You must explicitly use `--confirm` or set `CLEANUP_MODE=true` to perform deletions.

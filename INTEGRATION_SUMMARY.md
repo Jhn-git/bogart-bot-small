@@ -14,7 +14,7 @@ This final system integration delivers a production-ready multi-guild Discord bo
 - **GuildService**: Enhanced with guild filtering capabilities
 - **ChannelDiscoveryService**: Validates channel eligibility and permissions
 - **WanderingService**: Uses filtered guild list to prevent mass-messaging
-- **MessageCleanupService**: Respects guild filtering for safe cleanup operations
+- **MessageCleanupService**: Now performs limited, privacy-focused message scanning (default 100 per channel) to improve performance and reduce API usage.
 
 ### 2. Intelligent Security System ✅
 - **Smart Spam Prevention**: Per-guild 6-hour cooldowns + 12-hour global intervals
@@ -61,6 +61,7 @@ QUOTES_FILE=data/quotes.yaml
 
 # Optional
 CLEANUP_MODE=false  # Set to 'true' for cleanup mode
+CLEANUP_MAX_MESSAGES_PER_CHANNEL=100 # Sets the max number of messages to scan per channel
 # ALLOWED_GUILD_IDS not set - operates safely on all guilds
 ```
 
@@ -75,6 +76,7 @@ ALLOWED_GUILD_IDS=1105309398705897633
 
 # Optional
 CLEANUP_MODE=false
+CLEANUP_MAX_MESSAGES_PER_CHANNEL=100
 ```
 
 ### Docker Support
@@ -127,7 +129,7 @@ npx ts-node scripts/message-cleanup.ts --dry-run --hours=48
 - [`DiscordService`](src/services/discord.service.ts) → Discord client management
 - [`GuildService`](src/services/guild.service.ts) → **Enhanced** with filtering
 - [`ChannelDiscoveryService`](src/services/channel-discovery.service.ts) → Safe channel selection
-- [`MessageCleanupService`](src/services/message-cleanup.service.ts) → **Enhanced** with guild filtering
+- [`MessageCleanupService`](src/services/message-cleanup.service.ts) → **Enhanced** with limited message scanning for privacy and performance
 - [`WanderingService`](src/services/wandering.service.ts) → Mass-messaging **FIXED**
 
 ### Container Dependency Graph ✅
@@ -151,7 +153,7 @@ Container
 | Cleanup Integration | ✅ | Both startup and CLI modes working |
 | Test Suite Validation | ✅ | 37/37 tests passing |
 | Docker Integration | ✅ | Multi-stage build and security hardening |
-| Safety Validation | ✅ | Only bot messages targeted, rate limiting applied |
+| Safety Validation | ✅ | Limited message scanning, only bot messages targeted, rate limiting applied |
 | Documentation Complete | ✅ | README, ARCHITECTURE, and integration docs |
 | Production Ready | ✅ | System ready for immediate deployment |
 

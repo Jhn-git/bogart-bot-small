@@ -51,6 +51,7 @@ export class ConfigService {
     this.config = {
       discordToken: process.env.DISCORD_TOKEN || '',
       quotes,
+      cleanupMaxMessages: parseInt(process.env.CLEANUP_MAX_MESSAGES_PER_CHANNEL || '100', 10),
     };
 
     if (!this.config.discordToken) {

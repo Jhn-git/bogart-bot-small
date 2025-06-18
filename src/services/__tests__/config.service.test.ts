@@ -48,3 +48,16 @@ describe('ConfigService', () => {
     expect(configService.get('quotes')).toEqual(mockQuotes);
   });
 });
+it('should load the cleanupMaxMessages from environment variables', () => {
+    process.env.DISCORD_TOKEN = 'test_token';
+    process.env.CLEANUP_MAX_MESSAGES_PER_CHANNEL = '250';
+    const configService = new ConfigService();
+    expect(configService.get('cleanupMaxMessages')).toBe(250);
+  });
+
+  it('should use default cleanupMaxMessages if not in environment', () => {
+    process.env.DISCORD_TOKEN = 'test_token';
+    delete process.env.CLEANUP_MAX_MESSAGES_PER_CHANNEL;
+    const configService = new ConfigService();
+    expect(configService.get('cleanupMaxMessages')).toBe(100);
+  });

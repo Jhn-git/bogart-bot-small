@@ -9,6 +9,7 @@ export interface Quotes {
 export interface Config {
   discordToken: string;
   quotes: Quotes;
+  cleanupMaxMessages: number;
 }
 export interface MessageCleanupOptions {
   dryRun?: boolean;
@@ -17,6 +18,11 @@ export interface MessageCleanupOptions {
   batchSize?: number; // Discord API max: 100, default: 50
   rateLimitMs?: number; // ms between deletions
   logProgress?: boolean;
+  /**
+   * Maximum number of messages to scan per channel (default: 100).
+   * If set, scanning will stop after this many messages per channel.
+   */
+  maxMessagesPerChannel?: number;
 }
 
 export interface MessageCleanupLog {

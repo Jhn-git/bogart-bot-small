@@ -37,14 +37,16 @@ export class MessageCleanupService {
     }
     const botId = this.botUserId;
 
-    const {
-      dryRun = true,
-      confirm = false,
-      hours = 48,
-      batchSize = 50,
-      rateLimitMs = 1200,
-      logProgress = true,
-    } = options;
+  const {
+    dryRun = true,
+    confirm = false,
+    hours = 48,
+    batchSize = 50,
+    rateLimitMs = 1200,
+    logProgress = true,
+  } = options;
+
+  const maxMessagesPerChannel = this.configService.get('cleanupMaxMessages');
 
     const cutoff = Date.now() - hours * 60 * 60 * 1000;
     const deleted: MessageCleanupLog[] = [];
@@ -73,9 +75,15 @@ export class MessageCleanupService {
 
         let lastId: Snowflake | undefined = undefined;
         let done = false;
+        let scannedThisChannel = 0;
         while (!done) {
           try {
-            const messages: Collection<string, Message> = await textChannel.messages.fetch({ limit: batchSize, before: lastId });
+            // Adjust fetch size if close to maxMessagesPerChannel
+            const remaining = maxMessagesPerChannel - scannedThisChannel;
+            if (remaining <= 0) break;
+            const fetchLimit = Math.min(batchSize, remaining);
+
+            const messages: Collection<string, Message> = await textChannel.messages.fetch({ limit: fetchLimit, before: lastId });
             if (messages.size === 0) break;
             const toDelete = messages.filter(
               (msg: Message) =>
@@ -83,10 +91,11 @@ export class MessageCleanupService {
                 msg.createdTimestamp >= cutoff
             );
             totalScanned += messages.size;
+            scannedThisChannel += messages.size;
             totalMatched += toDelete.size;
 
             if (logProgress) {
-              console.log(`[${guild.name}#${textChannel.name}] Scanned: ${totalScanned}, Matched: ${totalMatched}`);
+              console.log(`[${guild.name}#${textChannel.name}] Scanned: ${totalScanned} (this channel: ${scannedThisChannel}/${maxMessagesPerChannel}), Matched: ${totalMatched}`);
             }
 
             for (const msg of toDelete.values()) {
@@ -121,7 +130,7 @@ export class MessageCleanupService {
               }
             }
             lastId = messages.last()?.id;
-            if (messages.size < batchSize) done = true;
+            if (messages.size < fetchLimit || scannedThisChannel >= maxMessagesPerChannel) done = true;
           } catch (err: any) {
             errors.push({
               guildId: guild.id,

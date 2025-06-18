@@ -45,8 +45,8 @@ check_prerequisites() {
         exit 1
     fi
     
-    if ! command -v docker-compose &> /dev/null; then
-        print_error "Docker Compose is not installed or not in PATH"
+    if ! docker compose version &> /dev/null; then
+        print_error "Docker Compose (plugin) is not installed or not in PATH"
         exit 1
     fi
     
@@ -69,31 +69,31 @@ deploy() {
     print_status "Deploying using docker-compose.yml..."
     check_prerequisites
     print_status "Building and starting environment..."
-    docker-compose up --build -d
+    docker compose up --build -d
     print_success "Deployment completed!"
     print_status "Container status:"
-    docker-compose ps
-    print_status "To view logs: docker-compose logs -f bogart-bot-prod"
-    print_status "To stop: docker-compose down"
+    docker compose ps
+    print_status "To view logs: docker compose logs -f bogart-bot-prod"
+    print_status "To stop: docker compose down"
 }
 
 # Function to stop services
 stop_services() {
     print_status "Stopping all services..."
-    docker-compose down
+    docker compose down
     print_success "All services stopped"
 }
 
 # Function to show logs
 show_logs() {
     print_status "Showing logs..."
-    docker-compose logs -f bogart-bot-prod
+    docker compose logs -f bogart-bot-prod
 }
 
 # Function to show status
 show_status() {
     print_status "Checking service status..."
-    docker-compose ps || true
+    docker compose ps || true
     echo ""
     print_status "Docker system info:"
     docker system df
@@ -102,8 +102,8 @@ show_status() {
 # Function to update deployment
 update_deployment() {
     print_status "Updating deployment..."
-    docker-compose pull
-    docker-compose up --build -d
+    docker compose pull
+    docker compose up --build -d
     print_success "Update completed!"
 }
 

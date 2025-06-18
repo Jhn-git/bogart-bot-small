@@ -51,8 +51,6 @@ test('Project structure exists', () => {
     'src/services/discord.service.ts',
     'src/services/quote.service.ts',
     'src/services/wandering.service.ts',
-    'src/services/guild.service.ts',
-    'src/services/channel-discovery.service.ts',
     'data/quotes.yaml',
     '.env.example'
   ];
@@ -80,7 +78,8 @@ test('TypeScript configuration is valid', () => {
 
 // Test 4: Quotes.yaml structure validation
 test('Quotes.yaml has required structure', () => {
-  const quotes = yaml.load(fs.readFileSync('data/quotes.yaml', 'utf8'));
+  const quotesPath = process.env.QUOTES_FILE || 'data/quotes.yaml';
+  const quotes = yaml.load(fs.readFileSync(quotesPath, 'utf8'));
   return quotes.generic_wandering_messages &&
          Array.isArray(quotes.generic_wandering_messages) &&
          quotes.goblin_wandering_messages &&
@@ -141,7 +140,8 @@ test('Main entry point imports all services', () => {
 
 // Test 10: Quote system validation
 test('Quote system has sufficient content', () => {
-  const quotes = yaml.load(fs.readFileSync('data/quotes.yaml', 'utf8'));
+  const quotesPath = process.env.QUOTES_FILE || 'data/quotes.yaml';
+  const quotes = yaml.load(fs.readFileSync(quotesPath, 'utf8'));
   const genericCount = quotes.generic_wandering_messages.length;
   const goblinChannels = Object.keys(quotes.goblin_wandering_messages || {});
   

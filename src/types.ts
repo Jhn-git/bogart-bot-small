@@ -8,6 +8,5 @@ export interface Quotes {
 
 export interface Config {
   discordToken: string;
-  guildId: string;
   quotes: Quotes;
 }

@@ -3,19 +3,28 @@ import {
   mockClient,
   mockConfigService,
   createMockTextChannel,
-} from '../../__tests__/mocks';
+} from '../../../tests/helpers/mocks';
+import { Client } from 'discord.js';
 
 jest.unmock('../discord.service');
+
+// Mock the Discord.js Client constructor
+jest.mock('discord.js', () => ({
+  ...jest.requireActual('discord.js'),
+  Client: jest.fn().mockImplementation(() => mockClient),
+}));
 
 describe('DiscordService', () => {
   let discordService: DiscordService;
 
   beforeEach(() => {
+    jest.clearAllMocks();
     (mockConfigService.get as jest.Mock).mockReturnValue('test_token');
     discordService = new DiscordService(mockConfigService);
   });
 
   it('should login with the token from the config service', async () => {
+    (mockClient.login as jest.Mock).mockResolvedValue(undefined);
     await discordService.login();
     expect(mockClient.login).toHaveBeenCalledWith('test_token');
   });

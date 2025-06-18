@@ -2,11 +2,15 @@ import { ConfigService } from './services/config.service';
 import { DiscordService } from './services/discord.service';
 import { QuoteService } from './services/quote.service';
 import { WanderingService } from './services/wandering.service';
+import { GuildService } from './services/guild.service';
+import { ChannelDiscoveryService } from './services/channel-discovery.service';
 
 class Container {
   public readonly configService: ConfigService;
   public readonly quoteService: QuoteService;
   public readonly discordService: DiscordService;
+  public readonly guildService: GuildService;
+  public readonly channelDiscoveryService: ChannelDiscoveryService;
   public readonly wanderingService: WanderingService;
 
   constructor() {
@@ -16,10 +20,13 @@ class Container {
 
     // Dependent services
     this.discordService = new DiscordService(this.configService);
+    this.guildService = new GuildService(this.discordService);
+    this.channelDiscoveryService = new ChannelDiscoveryService();
     this.wanderingService = new WanderingService(
       this.discordService,
       this.quoteService,
-      this.configService,
+      this.guildService,
+      this.channelDiscoveryService,
     );
   }
 }

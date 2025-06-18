@@ -48,10 +48,12 @@ test('Project structure exists', () => {
     'src/main.ts',
     'src/types.ts',
     'src/services/config.service.ts',
-    'src/services/discord.service.ts', 
+    'src/services/discord.service.ts',
     'src/services/quote.service.ts',
     'src/services/wandering.service.ts',
-    'quotes.yaml',
+    'src/services/guild.service.ts',
+    'src/services/channel-discovery.service.ts',
+    'data/quotes.yaml',
     '.env.example'
   ];
   
@@ -78,7 +80,7 @@ test('TypeScript configuration is valid', () => {
 
 // Test 4: Quotes.yaml structure validation
 test('Quotes.yaml has required structure', () => {
-  const quotes = yaml.load(fs.readFileSync('quotes.yaml', 'utf8'));
+  const quotes = yaml.load(fs.readFileSync('data/quotes.yaml', 'utf8'));
   return quotes.generic_wandering_messages &&
          Array.isArray(quotes.generic_wandering_messages) &&
          quotes.goblin_wandering_messages &&
@@ -89,7 +91,6 @@ test('Quotes.yaml has required structure', () => {
 test('Environment template is complete', () => {
   const envExample = fs.readFileSync('.env.example', 'utf8');
   return envExample.includes('DISCORD_TOKEN') &&
-         envExample.includes('GUILD_ID') &&
          envExample.includes('QUOTES_FILE');
 });
 
@@ -99,8 +100,10 @@ test('Service files can be imported', () => {
   const serviceFiles = [
     'src/services/config.service.ts',
     'src/services/discord.service.ts',
-    'src/services/quote.service.ts', 
-    'src/services/wandering.service.ts'
+    'src/services/quote.service.ts',
+    'src/services/wandering.service.ts',
+    'src/services/guild.service.ts',
+    'src/services/channel-discovery.service.ts'
   ];
   
   return serviceFiles.every(file => {
@@ -115,7 +118,9 @@ test('Test files exist for all services', () => {
     'src/services/__tests__/config.service.test.ts',
     'src/services/__tests__/discord.service.test.ts',
     'src/services/__tests__/quote.service.test.ts',
-    'src/services/__tests__/wandering.service.test.ts'
+    'src/services/__tests__/wandering.service.test.ts',
+    'src/services/__tests__/guild.service.test.ts',
+    'src/services/__tests__/channel-discovery.service.test.ts'
   ];
   
   return testFiles.every(file => fs.existsSync(file));
@@ -136,7 +141,7 @@ test('Main entry point imports all services', () => {
 
 // Test 10: Quote system validation
 test('Quote system has sufficient content', () => {
-  const quotes = yaml.load(fs.readFileSync('quotes.yaml', 'utf8'));
+  const quotes = yaml.load(fs.readFileSync('data/quotes.yaml', 'utf8'));
   const genericCount = quotes.generic_wandering_messages.length;
   const goblinChannels = Object.keys(quotes.goblin_wandering_messages || {});
   
@@ -155,9 +160,13 @@ test('Gitignore excludes sensitive files', () => {
 // Test 12: Integration dependencies
 test('Service integration points exist', () => {
   const wandering = fs.readFileSync('src/services/wandering.service.ts', 'utf8');
+  const container = fs.readFileSync('src/container.ts', 'utf8');
   return wandering.includes('DiscordService') &&
          wandering.includes('QuoteService') &&
-         wandering.includes('ConfigService');
+         wandering.includes('GuildService') &&
+         wandering.includes('ChannelDiscoveryService') &&
+         container.includes('GuildService') &&
+         container.includes('ChannelDiscoveryService');
 });
 
 console.log('\n📊 Validation Results');

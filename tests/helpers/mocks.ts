@@ -1,13 +1,13 @@
-import { ConfigService } from '../services/config.service';
-import { DiscordService } from '../services/discord.service';
-import { QuoteService } from '../services/quote.service';
-import { WanderingService } from '../services/wandering.service';
+import { ConfigService } from '../../src/services/config.service';
+import { DiscordService } from '../../src/services/discord.service';
+import { QuoteService } from '../../src/services/quote.service';
+import { WanderingService } from '../../src/services/wandering.service';
 import { Client, Collection, Guild, TextChannel } from 'discord.js';
 
-jest.mock('../services/config.service');
-jest.mock('../services/discord.service');
-jest.mock('../services/quote.service');
-jest.mock('../services/wandering.service');
+jest.mock('../../src/services/config.service');
+jest.mock('../../src/services/discord.service');
+jest.mock('../../src/services/quote.service');
+jest.mock('../../src/services/wandering.service');
 
 export const mockConfigService = new (ConfigService as jest.Mock)();
 export const mockQuoteService = new (QuoteService as jest.Mock)();

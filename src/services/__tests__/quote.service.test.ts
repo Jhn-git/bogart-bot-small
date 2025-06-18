@@ -1,5 +1,5 @@
 import { QuoteService } from '../quote.service';
-import { mockConfigService } from '../../__tests__/mocks';
+import { mockConfigService } from '../../../tests/helpers/mocks';
 import { Quotes } from '../../types';
 
 jest.unmock('../quote.service');

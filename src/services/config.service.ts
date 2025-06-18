@@ -15,7 +15,6 @@ export class ConfigService {
 
     this.config = {
       discordToken: process.env.DISCORD_TOKEN || '',
-      guildId: process.env.GUILD_ID || '',
       quotes,
     };
 

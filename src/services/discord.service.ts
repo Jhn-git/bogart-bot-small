@@ -25,7 +25,7 @@ export class DiscordService {
       await this.client.login(this.configService.get('discordToken'));
     } catch (error) {
       console.error('Failed to log in:', error);
-      process.exit(1);
+      throw error;
     }
   }
 

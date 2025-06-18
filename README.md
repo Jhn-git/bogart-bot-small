@@ -1,14 +1,15 @@
 # Bogart Discord Bot
 
-A quirky Discord bot that brings the charm of a mischievous goblin named Bogart to your Discord server. Bogart sends periodic "wandering messages" to channels, sharing his goblin wisdom, potion-brewing adventures, and movie-watching enthusiasm.
+A quirky and resilient Discord bot that brings the charm of a mischievous goblin named Bogart to all your Discord servers. Bogart now supports multiple guilds, sending periodic "wandering messages" with enhanced security and zero manual configuration. This update resolves a critical bug that previously caused mass messaging across guilds.
 
 ## Features
 
--   **Wandering Messages**: Periodic messages sent to Discord channels every 12 hours.
--   **Channel-Specific Content**: Specialized messages for channels like `goblin-cave`, `murky-swamp`, etc.
+-   **Multi-Guild Support**: Works seamlessly across multiple Discord servers simultaneously.
+-   **Intelligent Channel Discovery**: Automatically finds suitable channels to post in, requiring no manual configuration.
+-   **Improved Security**: Includes permission validation, rate limiting, and NSFW channel filtering.
+-   **Wandering Messages**: Sends periodic messages to channels every 12 hours.
 -   **Extensible Quote System**: Easily customizable messages via a YAML configuration file.
 -   **Dockerized**: Comes with a fully configured, production-ready Docker setup.
--   **Modular Architecture**: Clean, service-oriented design for easy maintenance.
 -   **Comprehensive Test Suite**: Full test coverage with Jest.
 
 ## Quick Start (Docker)
@@ -28,11 +29,10 @@ First, create a `.env` file from the example template:
 cp .env.example .env
 ```
 
-Next, edit the `.env` file and add your Discord bot token and guild ID:
+Next, edit the `.env` file and add your Discord bot token:
 
 ```
 DISCORD_TOKEN=your_discord_bot_token_here
-GUILD_ID=your_guild_id_for_testing
 ```
 
 ### 2. Run the Bot
@@ -154,7 +154,6 @@ npm run test:coverage
 | Variable        | Description                      | Default           | Required |
 | --------------- | -------------------------------- | ----------------- | :------: |
 | `DISCORD_TOKEN` | Your Discord bot token.          | -                 |    ✅    |
-| `GUILD_ID`      | The ID of your Discord server.   | -                 |    ✅    |
 | `QUOTES_FILE`   | Path to the quotes YAML file.    | `data/quotes.yaml` |    ❌    |
 | `LOG_LEVEL`     | The logging level.               | `info`            |    ❌    |
 | `NODE_ENV`      | The runtime environment.         | `production`      |    ❌    |
@@ -162,6 +161,12 @@ npm run test:coverage
 ### Quotes
 
 All bot messages are defined in `data/quotes.yaml`. You can add or modify messages without needing to rebuild the Docker image.
+
+## Architecture
+
+The bot has been redesigned with a robust, multi-guild architecture that prevents the critical bugs present in the previous single-guild design. The new system uses an intelligent channel discovery algorithm to find safe and appropriate channels for posting messages, eliminating the need for hardcoded channel IDs.
+
+For a detailed explanation of the new architecture, see [ARCHITECTURE.md](ARCHITECTURE.md).
 
 ```yaml
 # Generic messages for any channel

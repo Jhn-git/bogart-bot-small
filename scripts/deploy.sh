@@ -87,7 +87,7 @@ stop_services() {
 # Function to show logs
 show_logs() {
     print_status "Showing logs..."
-    docker compose logs -f bogart-bot-prod
+    docker compose logs -f bogart-bot
 }
 
 # Function to show status

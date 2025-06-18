@@ -119,7 +119,7 @@ describe('Multi-Guild Integration Test', () => {
 
     // Real services that will be tested
     const guildService = new GuildService(mockDiscordService);
-    const channelDiscoveryService = new ChannelDiscoveryService();
+    const channelDiscoveryService = new ChannelDiscoveryService(mockConfigService);
     const quoteService = new QuoteService(mockConfigService);
 
     wanderingService = new WanderingService(
@@ -179,5 +179,48 @@ describe('Multi-Guild Integration Test', () => {
     expect(mockDiscordService.sendMessage).not.toHaveBeenCalledWith('c6', expect.any(String));
     expect(mockDiscordService.sendMessage).not.toHaveBeenCalledWith('c7', expect.any(String));
     expect(mockDiscordService.sendMessage).not.toHaveBeenCalledWith('c8', expect.any(String));
+  });
+
+  it('should only send messages to guilds in ALLOWED_GUILD_IDS when set', async () => {
+    // Arrange: Set the allowed guild IDs environment variable
+    process.env.ALLOWED_GUILD_IDS = 'g1,g3'; // Allow Guild One and Three
+
+    // We need to re-initialize the services that depend on the environment variable
+    const guildService = new GuildService(mockDiscordService);
+    const channelDiscoveryService = new ChannelDiscoveryService(mockConfigService);
+    const quoteService = new QuoteService(mockConfigService);
+    wanderingService = new WanderingService(
+      mockDiscordService,
+      quoteService,
+      guildService,
+      channelDiscoveryService
+    );
+
+    const guild1 = createMockGuild('g1', 'Guild One', [
+      { id: 'c1', name: 'general', type: ChannelType.GuildText, nsfw: false, canSend: true },
+    ]);
+    const guild2 = createMockGuild('g2', 'Guild Two', [
+      { id: 'c4', name: 'bot-spam', type: ChannelType.GuildText, nsfw: false, canSend: true },
+    ]);
+    const guild3 = createMockGuild('g3', 'Guild Three (Allowed but no eligible channels)', [
+      { id: 'c7', name: 'no-perms', type: ChannelType.GuildText, nsfw: false, canSend: false },
+    ]);
+
+    mockClient.guilds.cache.set(guild1.id, guild1);
+    mockClient.guilds.cache.set(guild2.id, guild2);
+    mockClient.guilds.cache.set(guild3.id, guild3);
+
+    // Act
+    await (wanderingService as any).sendWanderingMessages();
+
+    // Assert
+    expect(mockDiscordService.sendMessage).toHaveBeenCalledTimes(1);
+    expect(mockDiscordService.sendMessage).toHaveBeenCalledWith('c1', 'Hello there!');
+    
+    // Ensure no message was sent to the non-allowed guild (g2)
+    expect(mockDiscordService.sendMessage).not.toHaveBeenCalledWith('c4', expect.any(String));
+
+    // Cleanup env var
+    delete process.env.ALLOWED_GUILD_IDS;
   });
 });

@@ -23,7 +23,7 @@ public readonly messageCleanupService: MessageCleanupService;
     // Dependent services
     this.discordService = new DiscordService(this.configService);
     this.guildService = new GuildService(this.discordService);
-    this.channelDiscoveryService = new ChannelDiscoveryService();
+    this.channelDiscoveryService = new ChannelDiscoveryService(this.configService);
     this.wanderingService = new WanderingService(
       this.discordService,
       this.quoteService,

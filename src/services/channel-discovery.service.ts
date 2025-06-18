@@ -1,8 +1,22 @@
 // src/services/channel-discovery.service.ts
 
 import { Guild, TextChannel, PermissionsBitField, ChannelType } from 'discord.js';
+import { ConfigService } from './config.service';
 
 export class ChannelDiscoveryService {
+  private specialChannelNames: string[] = [];
+
+  constructor(private configService: ConfigService) {
+    this.loadSpecialChannelNames();
+  }
+
+  private loadSpecialChannelNames(): void {
+    const quotesConfig = this.configService.get('quotes');
+    if (quotesConfig && quotesConfig.goblin_wandering_messages) {
+      this.specialChannelNames = Object.keys(quotesConfig.goblin_wandering_messages);
+    }
+  }
+
   /**
    * Returns a list of eligible text channels for messaging in a guild.
    * Applies naming patterns, permission checks, and channel type validation.
@@ -38,7 +52,11 @@ export class ChannelDiscoveryService {
     // Naming pattern (customize as needed)
     const name = channel.name.toLowerCase();
     const allowedPatterns = ['general', 'bot', 'chat', 'talk', 'quotes'];
-    if (!allowedPatterns.some((pattern) => name.includes(pattern))) {
+    const isAllowed =
+      allowedPatterns.some((pattern) => name.includes(pattern)) ||
+      this.specialChannelNames.includes(name);
+
+    if (!isAllowed) {
       return false;
     }
 

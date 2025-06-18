@@ -5,7 +5,7 @@ yarn-debug.log*
 yarn-error.log*
 
 # Build output (will be built inside container)
-dist/
+dist
 *.tsbuildinfo
 
 # Environment files (will be provided via Docker)
@@ -35,51 +35,6 @@ Thumbs.db
 .git
 .gitignore
 .gitattributes
-
-# Documentation and development files
-README.md
-DEPLOYMENT.md
-*.md
-
-# Test files and coverage
-coverage/
-*.lcov
-.nyc_output
-.jest
-
-# Logs
-logs
-*.log
-
-# Runtime data
-pids
-*.pid
-*.seed
-*.pid.lock
-
-# Cache directories
-.npm
-.eslintcache
-.rpt2_cache/
-.rts2_cache_cjs/
-.rts2_cache_es/
-.rts2_cache_umd/
-.cache
-.parcel-cache
-
-# Docker files
-Dockerfile*
-docker-compose*.yml
-.dockerignore
-
-# Development scripts
-scripts/
-
-# Test directories
-src/__tests__/
-src/**/__tests__/
-**/*.test.ts
-**/*.spec.ts
 
 # Optional files
 .node_repl_history

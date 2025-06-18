@@ -1,6 +1,7 @@
 // src/services/__tests__/channel-discovery.service.test.ts
 
 import { ChannelDiscoveryService } from '../channel-discovery.service';
+import { ConfigService } from '../config.service';
 import { Guild, Collection, PermissionsBitField, ChannelType, GuildMember } from 'discord.js';
 
 describe('ChannelDiscoveryService', () => {
@@ -33,7 +34,14 @@ describe('ChannelDiscoveryService', () => {
   };
 
   beforeEach(() => {
-    channelDiscoveryService = new ChannelDiscoveryService();
+    const mockConfigService = {
+      get: jest.fn().mockReturnValue({
+        goblin_wandering_messages: {
+          'goblin-cave': ['Test message']
+        }
+      })
+    } as any;
+    channelDiscoveryService = new ChannelDiscoveryService(mockConfigService);
     mockChannels = new Collection<string, any>();
 
     mockGuild = {

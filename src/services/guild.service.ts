@@ -14,13 +14,16 @@ export class GuildService {
   }
 
   private initializeAllowedGuilds(): void {
-    // Get allowed guild IDs from environment variable
+    // Get allowed guild IDs from environment variable (for development/testing only)
     const allowedGuilds = process.env.ALLOWED_GUILD_IDS;
     if (allowedGuilds) {
       this.allowedGuildIds = allowedGuilds.split(',').map(id => id.trim());
-      console.log(`GuildService initialized with ${this.allowedGuildIds.length} allowed guild(s)`);
+      console.log(`🚧 GuildService initialized with ${this.allowedGuildIds.length} allowed guild(s) (DEVELOPMENT MODE ONLY)`);
+      console.log(`🚧 For production deployment, remove ALLOWED_GUILD_IDS from environment variables`);
     } else {
-      console.warn('No ALLOWED_GUILD_IDS specified. Bot will operate on ALL guilds (DANGEROUS!)');
+      // Production mode: operate on all guilds with intelligent spam prevention
+      this.allowedGuildIds = [];
+      console.log(`🚀 GuildService initialized for multi-guild operation (PRODUCTION MODE)`);
     }
   }
 
@@ -31,9 +34,8 @@ export class GuildService {
     const client = this.discordService.getClient();
     const allGuilds = Array.from(client.guilds.cache.values());
     
-    // If no allowed guilds specified, return all (with warning)
+    // If no allowed guilds specified, return all
     if (this.allowedGuildIds.length === 0) {
-      console.warn(`WARNING: Operating on ALL ${allGuilds.length} guilds. This could cause mass-messaging!`);
       return allGuilds;
     }
 

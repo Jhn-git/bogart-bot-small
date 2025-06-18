@@ -34,20 +34,46 @@ For each guild, the channel discovery service performs the following steps:
 
 This process ensures that Bogart only posts in active, appropriate, and safe channels.
 
-## 3. Security and Bug Prevention
+## 3. Security and Intelligent Spam Prevention
 
-The new architecture directly addresses the previous mass-messaging bug. Here’s how:
+The new architecture directly addresses the previous mass-messaging bug through intelligent design rather than restrictive configuration:
 
--   **Guild Isolation**: The core logic now iterates through each guild one by one. The channel discovery and message sending processes are scoped to the current guild in the iteration. This makes it impossible for the bot to accidentally fetch channels from one guild and send a message to another.
--   **Removal of Global Configuration**: By removing `GUILD_ID` and `WANDERING_CHANNEL_IDS`, we have eliminated the single point of failure. The bot no longer relies on a static, hardcoded configuration that could be misconfigured.
--   **Strict Permission Checks**: The bot will not attempt to operate in any channel where it lacks explicit permissions. This prevents errors and ensures the bot behaves as expected by server administrators.
--   **Rate Limiting**: The bot respects Discord's rate limits to prevent spamming and ensure it is not kicked from servers for abusive behavior.
+-   **Guild Isolation**: The core logic iterates through each guild independently. Channel discovery and message sending are scoped per guild, making cross-guild messaging impossible.
+-   **Intelligent Rate Limiting**:
+    -   Global 12-hour intervals between wandering cycles
+    -   Per-guild 6-hour cooldowns to prevent spam
+    -   Smart channel selection with randomization
+-   **Permission-Based Safety**: The bot validates permissions before every operation, ensuring it only acts where explicitly allowed.
+-   **Channel Intelligence**: Sophisticated channel discovery that:
+    -   Only targets appropriate channels (general, chat, bot-related)
+    -   Avoids NSFW channels automatically
+    -   Respects channel permissions and visibility
+-   **Development Safety**: `ALLOWED_GUILD_IDS` available for development/testing but not required for production
 
-## 4. Zero-Configuration Setup
+## 4. Production-Ready Multi-Guild Operation
 
-The primary goal of this redesign was to simplify the setup process. Server owners can now invite the bot and have it work immediately, with no extra steps.
+The architecture is designed for safe, zero-configuration multi-guild deployment:
 
--   **No IDs Required**: The removal of `GUILD_ID` and `WANDERING_CHANNEL_IDS` from the `.env` file means the only required variable is the `DISCORD_TOKEN`.
--   **Automated Discovery**: The bot handles channel selection automatically, adapting to any server's layout and permissions.
+-   **Production Ready**: Only requires `DISCORD_TOKEN` - no guild or channel IDs needed
+-   **Development Safety**: `ALLOWED_GUILD_IDS` available for testing but discouraged in production
+-   **Automated Discovery**: Intelligent channel discovery adapts to any server layout
+-   **Built-in Safety**: Multiple layers of spam prevention and permission validation
+-   **Horizontal Scaling**: Performance remains stable as the bot joins more guilds
 
-This streamlined setup process makes the bot more accessible and user-friendly, while the robust backend architecture ensures it is more reliable and secure than ever before.
+### Environment Configuration
+
+**Production (Recommended):**
+```bash
+DISCORD_TOKEN=your_bot_token_here
+QUOTES_FILE=data/quotes.yaml
+# ALLOWED_GUILD_IDS not set - operates on all guilds safely
+```
+
+**Development/Testing:**
+```bash
+DISCORD_TOKEN=your_bot_token_here
+QUOTES_FILE=data/quotes.yaml
+ALLOWED_GUILD_IDS=1105309398705897633  # Restrict to test guild
+```
+
+This design makes the bot immediately deployable across multiple Discord servers while maintaining the highest standards of safety and reliability.

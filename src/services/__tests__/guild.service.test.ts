@@ -8,68 +8,99 @@ import { Client, Collection, Guild } from 'discord.js';
 jest.mock('../discord.service');
 
 describe('GuildService', () => {
-  let guildService: GuildService;
   let mockDiscordService: jest.Mocked<DiscordService>;
   let mockClient: jest.Mocked<Client>;
   let mockGuilds: Collection<string, Guild>;
+  const originalEnv = process.env;
 
   beforeEach(() => {
-    // Reset mocks before each test
-    jest.clearAllMocks();
+    jest.resetModules();
+    process.env = { ...originalEnv };
 
-    // Mock Guilds
     mockGuilds = new Collection<string, Guild>();
     mockGuilds.set('1', { id: '1', name: 'Guild 1' } as Guild);
     mockGuilds.set('2', { id: '2', name: 'Guild 2' } as Guild);
+    mockGuilds.set('1105309398705897633', { id: '1105309398705897633', name: 'Dev Guild' } as Guild);
 
-    // Mock Client
     mockClient = {
-      guilds: {
-        cache: mockGuilds,
-      },
+      guilds: { cache: mockGuilds },
     } as unknown as jest.Mocked<Client>;
 
-    // Mock DiscordService instance
-    mockDiscordService = new DiscordService({} as any) as jest.Mocked<DiscordService>;
-    mockDiscordService.getClient = jest.fn().mockReturnValue(mockClient);
-
-    guildService = new GuildService(mockDiscordService);
+    mockDiscordService = {
+      getClient: jest.fn().mockReturnValue(mockClient),
+    } as unknown as jest.Mocked<DiscordService>;
   });
 
-  describe('getAllGuilds', () => {
-    it('should return all guilds from the client cache', () => {
+  afterEach(() => {
+    process.env = originalEnv;
+    jest.clearAllMocks();
+  });
+
+  describe('when ALLOWED_GUILD_IDS is not set', () => {
+    let guildService: GuildService;
+
+    beforeEach(() => {
+      delete process.env.ALLOWED_GUILD_IDS;
+      guildService = new GuildService(mockDiscordService);
+    });
+
+    it('getAllGuilds should return all guilds', () => {
+      const guilds = guildService.getAllGuilds();
+      expect(guilds).toHaveLength(3);
+      expect(guilds.map(g => g.id)).toEqual(['1', '2', '1105309398705897633']);
+    });
+
+    it('getGuildById should return a guild if it exists', () => {
+      expect(guildService.getGuildById('1')?.name).toBe('Guild 1');
+      expect(guildService.getGuildById('3')).toBeUndefined();
+    });
+
+    it('isGuildAllowed should always return true', () => {
+      expect(guildService.isGuildAllowed('1')).toBe(true);
+      expect(guildService.isGuildAllowed('3')).toBe(true);
+    });
+
+    it('getAllowedGuildIds should return an empty array', () => {
+      expect(guildService.getAllowedGuildIds()).toEqual([]);
+    });
+  });
+
+  describe('when ALLOWED_GUILD_IDS is set', () => {
+    let guildService: GuildService;
+    const devGuildId = '1105309398705897633';
+
+    beforeEach(() => {
+      process.env.ALLOWED_GUILD_IDS = `1, ${devGuildId}`;
+      guildService = new GuildService(mockDiscordService);
+    });
+
+    it('getAllGuilds should return only allowed guilds', () => {
       const guilds = guildService.getAllGuilds();
       expect(guilds).toHaveLength(2);
-      expect(guilds.map(g => g.id)).toEqual(['1', '2']);
-      expect(mockDiscordService.getClient).toHaveBeenCalledTimes(1);
+      expect(guilds.map(g => g.id)).toEqual(['1', devGuildId]);
     });
 
-    it('should return an empty array if there are no guilds', () => {
-        mockGuilds.clear();
-        const guilds = guildService.getAllGuilds();
-        expect(guilds).toHaveLength(0);
-    });
-  });
-
-  describe('getGuildById', () => {
-    it('should return the correct guild by its ID', () => {
-      const guild = guildService.getGuildById('1');
-      expect(guild).toBeDefined();
-      expect(guild?.id).toBe('1');
-      expect(mockDiscordService.getClient).toHaveBeenCalledTimes(1);
+    it('getGuildById should only return allowed guilds', () => {
+      expect(guildService.getGuildById('1')?.name).toBe('Guild 1');
+      expect(guildService.getGuildById(devGuildId)?.name).toBe('Dev Guild');
+      expect(guildService.getGuildById('2')).toBeUndefined();
     });
 
-    it('should return undefined if the guild ID does not exist', () => {
-      const guild = guildService.getGuildById('3');
-      expect(guild).toBeUndefined();
+    it('isGuildAllowed should return true for allowed guilds and false for others', () => {
+      expect(guildService.isGuildAllowed('1')).toBe(true);
+      expect(guildService.isGuildAllowed(devGuildId)).toBe(true);
+      expect(guildService.isGuildAllowed('2')).toBe(false);
+      expect(guildService.isGuildAllowed('3')).toBe(false);
     });
-  });
 
-  describe('discoverGuilds', () => {
-    it('should return all guilds', () => {
+    it('getAllowedGuildIds should return the correct list of IDs', () => {
+      expect(guildService.getAllowedGuildIds()).toEqual(['1', devGuildId]);
+    });
+
+    it('discoverGuilds should only return allowed guilds', () => {
       const guilds = guildService.discoverGuilds();
       expect(guilds).toHaveLength(2);
-      expect(guilds.map(g => g.id)).toEqual(['1', '2']);
+      expect(guilds.map(g => g.id)).toEqual(['1', devGuildId]);
     });
   });
 });

@@ -2,6 +2,10 @@
 
 A quirky and resilient Discord bot that brings the charm of a mischievous goblin named Bogart to all your Discord servers. Bogart now supports multiple guilds, sending periodic "wandering messages" with enhanced security and zero manual configuration. This update resolves a critical bug that previously caused mass messaging across guilds.
 
+## Multi-Guild Operation & Spam Prevention
+
+Bogart now operates safely across all guilds it is invited to by default. The `ALLOWED_GUILD_IDS` environment variable is **optional** and intended for development/testing only. In production, the bot uses intelligent channel discovery and per-guild rate limiting to prevent spam and ensure safe operation.
+
 ## Features
 
 -   **Multi-Guild Support**: Works seamlessly across multiple Discord servers simultaneously.
@@ -29,11 +33,16 @@ First, create a `.env` file from the example template:
 cp .env.example .env
 ```
 
-Next, edit the `.env` file and add your Discord bot token:
+Next, edit the `.env` file and add your Discord bot token. Optionally, for development/testing, you can restrict the bot to specific guilds:
 
 ```
 DISCORD_TOKEN=your_discord_bot_token_here
+
+# (Optional, for development/testing only)
+# ALLOWED_GUILD_IDS=1105309398705897633
 ```
+
+In production, leave `ALLOWED_GUILD_IDS` unset to allow the bot to operate in all invited guilds.
 
 ### 2. Run the Bot
 
@@ -151,13 +160,14 @@ npm run test:coverage
 
 ### Environment Variables
 
-| Variable        | Description                      | Default           | Required |
-| --------------- | -------------------------------- | ----------------- | :------: |
-| `DISCORD_TOKEN` | Your Discord bot token.          | -                 |    ✅    |
-| `QUOTES_FILE`   | Path to the quotes YAML file.    | `data/quotes.yaml` |    ❌    |
-| `LOG_LEVEL`     | The logging level.               | `info`            |    ❌    |
-| `NODE_ENV`      | The runtime environment.         | `production`      |    ❌    |
-| `CLEANUP_MODE`  | If `true`, runs the message cleanup on startup. | `false` | ❌ |
+| Variable | Description | Default | Required |
+| :--- | :--- | :--- | :---: |
+| `DISCORD_TOKEN` | Your Discord bot token. | - | ✅ |
+| `ALLOWED_GUILD_IDS` | (Optional, dev/testing only) Comma-separated list of Discord Server (Guild) IDs to restrict bot operation. | unset | ❌ |
+| `QUOTES_FILE` | Path to the quotes YAML file. | `data/quotes.yaml` | ❌ |
+| `LOG_LEVEL` | The logging level. | `info` | ❌ |
+| `NODE_ENV` | The runtime environment. | `production` | ❌ |
+| `CLEANUP_MODE` | If `true`, runs the message cleanup on startup. | `false` | ❌ |
 
 ### Quotes
 
@@ -165,7 +175,7 @@ All bot messages are defined in `data/quotes.yaml`. You can add or modify messag
 
 ## Architecture
 
-The bot has been redesigned with a robust, multi-guild architecture that prevents the critical bugs present in the previous single-guild design. The new system uses an intelligent channel discovery algorithm to find safe and appropriate channels for posting messages, eliminating the need for hardcoded channel IDs.
+The bot has been redesigned with a robust, multi-guild architecture that prevents the critical bugs present in the previous single-guild design. The new system uses an intelligent channel discovery algorithm and per-guild rate limiting to find safe and appropriate channels for posting messages, eliminating the need for hardcoded channel IDs and preventing spam.
 
 For a detailed explanation of the new architecture, see [ARCHITECTURE.md](ARCHITECTURE.md).
 

@@ -11,11 +11,16 @@ COPY package*.json ./
 # Install all dependencies (including dev dependencies for building)
 RUN npm ci
 
-# Copy source code and configuration
-COPY . .
+# Copy source code and configuration files
+COPY src ./src
+COPY tsconfig.json .
+COPY tsconfig.build.json .
+
+# List the copied files to debug the build context
+RUN ls -laR
 
 # Build the TypeScript code
-RUN npm run build
+RUN npm run build:prod
 
 # Stage 2: Development stage
 FROM node:18-alpine AS development

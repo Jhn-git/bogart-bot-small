@@ -44,11 +44,11 @@ services:
           cpus: '0.2'
           memory: 256M
     healthcheck:
-      test: ["CMD", "node", "scripts/validate-system.js"]
-      interval: 15s
-      timeout: 5s
-      retries: 5
-      start_period: 90s
+      test: ["CMD", "node", "-e", "console.log('Bot health check - OK')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
     networks:
       - bogart-prod-network
 

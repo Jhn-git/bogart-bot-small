@@ -53,6 +53,45 @@ async function main() {
 
   try {
     await container.discordService.login();
+
+    if (process.env.CLEANUP_MODE === 'true') {
+      console.log('CLEANUP_MODE enabled. Running message cleanup...');
+      await container.messageCleanupService.init();
+      const dryRun = process.argv.includes('--dry-run') || !process.argv.includes('--confirm');
+      const confirm = process.argv.includes('--confirm');
+      const hoursArg = process.argv.find((arg) => arg.startsWith('--hours='));
+      const hours = hoursArg ? parseInt(hoursArg.split('=')[1], 10) : 48;
+
+      const result = await container.messageCleanupService.cleanupMessages({
+        dryRun,
+        confirm,
+        hours,
+        logProgress: true,
+      });
+
+      console.log('\nCleanup Summary:');
+      console.log(`Scanned: ${result.scanned}`);
+      console.log(`Matched: ${result.matched}`);
+      console.log(`Deleted: ${result.deleted.length}`);
+      console.log(`Errors: ${result.errors.length}`);
+
+      if (result.deleted.length > 0) {
+        console.log('\nDeleted/Dry-run Messages:');
+        result.deleted.forEach((log) => {
+          console.log(`[${log.action}] Guild: ${log.guildId}, Channel: ${log.channelId}, Message: ${log.messageId}, Reason: ${log.reason}`);
+        });
+      }
+
+      if (result.errors.length > 0) {
+        console.log('\nErrors:');
+        result.errors.forEach((log) => {
+          console.error(`[${log.action}] Guild: ${log.guildId}, Channel: ${log.channelId}, Message: ${log.messageId}, Reason: ${log.reason}`);
+        });
+      }
+
+      process.exit(0);
+    }
+
     container.wanderingService.start();
     console.log('Bogart Discord Bot started successfully!');
   } catch (error) {

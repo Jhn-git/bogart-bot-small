@@ -4,6 +4,7 @@ import { QuoteService } from './services/quote.service';
 import { WanderingService } from './services/wandering.service';
 import { GuildService } from './services/guild.service';
 import { ChannelDiscoveryService } from './services/channel-discovery.service';
+import { MessageCleanupService } from './services/message-cleanup.service';
 
 class Container {
   public readonly configService: ConfigService;
@@ -11,6 +12,7 @@ class Container {
   public readonly discordService: DiscordService;
   public readonly guildService: GuildService;
   public readonly channelDiscoveryService: ChannelDiscoveryService;
+public readonly messageCleanupService: MessageCleanupService;
   public readonly wanderingService: WanderingService;
 
   constructor() {
@@ -28,6 +30,7 @@ class Container {
       this.guildService,
       this.channelDiscoveryService,
     );
+    this.messageCleanupService = new MessageCleanupService(this.discordService, this.configService);
   }
 }
 

@@ -64,101 +64,36 @@ check_prerequisites() {
     print_success "Prerequisites check completed"
 }
 
-# Function to deploy in development mode
-deploy_dev() {
-    print_status "Deploying in development mode..."
+# Function to deploy (single mode)
+deploy() {
+    print_status "Deploying using docker-compose.yml..."
     check_prerequisites
-    
-    print_status "Building and starting development environment..."
-    docker-compose -f docker-compose.yml -f docker-compose.dev.yml up --build -d
-    
-    print_success "Development deployment completed!"
+    print_status "Building and starting environment..."
+    docker-compose up --build -d
+    print_success "Deployment completed!"
     print_status "Container status:"
     docker-compose ps
-    
-    print_status "To view logs: docker-compose logs -f bogart-bot"
+    print_status "To view logs: docker-compose logs -f bogart-bot-prod"
     print_status "To stop: docker-compose down"
-}
-
-# Function to deploy in production mode
-deploy_prod() {
-    print_status "Deploying in production mode..."
-    check_prerequisites
-    
-    # Create production log directory if it doesn't exist
-    if [ ! -d "/var/log/bogart-bot" ]; then
-        print_status "Creating production log directory..."
-        sudo mkdir -p /var/log/bogart-bot
-        sudo chown 1001:1001 /var/log/bogart-bot
-    fi
-    
-    print_status "Building and starting production environment..."
-    docker-compose -f docker-compose.yml -f docker-compose.prod.yml up --build -d
-    
-    print_success "Production deployment completed!"
-    print_status "Container status:"
-    docker-compose -f docker-compose.yml -f docker-compose.prod.yml ps
-    
-    print_status "To view logs: docker-compose -f docker-compose.yml -f docker-compose.prod.yml logs -f bogart-bot"
-    print_status "To stop: docker-compose -f docker-compose.yml -f docker-compose.prod.yml down"
 }
 
 # Function to stop services
 stop_services() {
     print_status "Stopping all services..."
-    
-    # Stop development services if running
-    if docker-compose -f docker-compose.yml -f docker-compose.dev.yml ps | grep -q "Up"; then
-        print_status "Stopping development services..."
-        docker-compose -f docker-compose.yml -f docker-compose.dev.yml down
-    fi
-    
-    # Stop production services if running
-    if docker-compose -f docker-compose.yml -f docker-compose.prod.yml ps | grep -q "Up"; then
-        print_status "Stopping production services..."
-        docker-compose -f docker-compose.yml -f docker-compose.prod.yml down
-    fi
-    
+    docker-compose down
     print_success "All services stopped"
 }
 
 # Function to show logs
 show_logs() {
-    local environment=${1:-""}
-    
-    if [ "$environment" = "prod" ] || [ "$environment" = "production" ]; then
-        print_status "Showing production logs..."
-        docker-compose -f docker-compose.yml -f docker-compose.prod.yml logs -f bogart-bot
-    elif [ "$environment" = "dev" ] || [ "$environment" = "development" ]; then
-        print_status "Showing development logs..."
-        docker-compose -f docker-compose.yml -f docker-compose.dev.yml logs -f bogart-bot
-    else
-        # Try to detect which environment is running
-        if docker-compose -f docker-compose.yml -f docker-compose.prod.yml ps | grep -q "Up"; then
-            print_status "Showing production logs..."
-            docker-compose -f docker-compose.yml -f docker-compose.prod.yml logs -f bogart-bot
-        elif docker-compose -f docker-compose.yml -f docker-compose.dev.yml ps | grep -q "Up"; then
-            print_status "Showing development logs..."
-            docker-compose -f docker-compose.yml -f docker-compose.dev.yml logs -f bogart-bot
-        else
-            print_error "No running services found. Please specify 'dev' or 'prod'"
-            exit 1
-        fi
-    fi
+    print_status "Showing logs..."
+    docker-compose logs -f bogart-bot-prod
 }
 
 # Function to show status
 show_status() {
     print_status "Checking service status..."
-    
-    echo ""
-    print_status "Development services:"
-    docker-compose -f docker-compose.yml -f docker-compose.dev.yml ps || true
-    
-    echo ""
-    print_status "Production services:"
-    docker-compose -f docker-compose.yml -f docker-compose.prod.yml ps || true
-    
+    docker-compose ps || true
     echo ""
     print_status "Docker system info:"
     docker system df
@@ -166,36 +101,21 @@ show_status() {
 
 # Function to update deployment
 update_deployment() {
-    local environment=${1:-"prod"}
-    
-    print_status "Updating $environment deployment..."
-    
-    if [ "$environment" = "dev" ] || [ "$environment" = "development" ]; then
-        print_status "Pulling latest changes and rebuilding development environment..."
-        docker-compose -f docker-compose.yml -f docker-compose.dev.yml pull
-        docker-compose -f docker-compose.yml -f docker-compose.dev.yml up --build -d
-    else
-        print_status "Pulling latest changes and rebuilding production environment..."
-        docker-compose -f docker-compose.yml -f docker-compose.prod.yml pull
-        docker-compose -f docker-compose.yml -f docker-compose.prod.yml up --build -d
-    fi
-    
+    print_status "Updating deployment..."
+    docker-compose pull
+    docker-compose up --build -d
     print_success "Update completed!"
 }
 
 # Function to clean up Docker resources
 cleanup() {
     print_status "Cleaning up Docker resources..."
-    
     print_status "Removing unused images..."
     docker image prune -f
-    
     print_status "Removing unused volumes..."
     docker volume prune -f
-    
     print_status "Removing unused networks..."
     docker network prune -f
-    
     print_success "Cleanup completed!"
 }
 
@@ -204,19 +124,15 @@ backup_config() {
     local backup_dir="backups"
     local timestamp=$(date +%Y%m%d_%H%M%S)
     local backup_file="bogart-backup-$timestamp.tar.gz"
-    
     print_status "Creating backup..."
-    
     mkdir -p "$backup_dir"
-    
     tar -czf "$backup_dir/$backup_file" \
         .env \
         data/quotes.yaml \
-        docker-compose*.yml \
+        docker-compose.yml \
         Dockerfile \
         .dockerignore \
         2>/dev/null || true
-    
     print_success "Backup created: $backup_dir/$backup_file"
 }
 
@@ -224,46 +140,41 @@ backup_config() {
 show_help() {
     echo "Bogart Discord Bot Deployment Script"
     echo ""
-    echo "Usage: $0 [COMMAND] [OPTIONS]"
+    echo "Usage: $0 [COMMAND]"
     echo ""
     echo "Commands:"
-    echo "  dev                Deploy in development mode"
-    echo "  prod               Deploy in production mode"
+    echo "  deploy             Deploy using docker-compose.yml"
     echo "  stop               Stop all services"
-    echo "  logs [env]         Show logs (env: dev/prod, auto-detect if omitted)"
+    echo "  logs               Show logs"
     echo "  status             Show service status"
-    echo "  update [env]       Update deployment (env: dev/prod, default: prod)"
+    echo "  update             Update deployment"
     echo "  cleanup            Clean up unused Docker resources"
     echo "  backup             Backup configuration files"
     echo "  help               Show this help message"
     echo ""
     echo "Examples:"
-    echo "  $0 dev             # Deploy in development mode"
-    echo "  $0 prod            # Deploy in production mode"
-    echo "  $0 logs prod       # Show production logs"
-    echo "  $0 update dev      # Update development deployment"
+    echo "  $0 deploy          # Deploy using docker-compose.yml"
+    echo "  $0 logs            # Show logs"
+    echo "  $0 update          # Update deployment"
     echo ""
 }
 
 # Main script logic
 case "${1:-help}" in
-    "dev"|"development")
-        deploy_dev
-        ;;
-    "prod"|"production")
-        deploy_prod
+    "deploy")
+        deploy
         ;;
     "stop")
         stop_services
         ;;
     "logs")
-        show_logs "$2"
+        show_logs
         ;;
     "status")
         show_status
         ;;
     "update")
-        update_deployment "$2"
+        update_deployment
         ;;
     "cleanup")
         cleanup

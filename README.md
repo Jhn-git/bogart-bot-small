@@ -157,6 +157,7 @@ npm run test:coverage
 | `QUOTES_FILE`   | Path to the quotes YAML file.    | `data/quotes.yaml` |    ❌    |
 | `LOG_LEVEL`     | The logging level.               | `info`            |    ❌    |
 | `NODE_ENV`      | The runtime environment.         | `production`      |    ❌    |
+| `CLEANUP_MODE`  | If `true`, runs the message cleanup on startup. | `false` | ❌ |
 
 ### Quotes
 
@@ -180,6 +181,88 @@ goblin_wandering_messages:
   murky-swamp:
     - "Something slimy this way comes..."
 ```
+
+## Emergency Message Cleanup
+
+An emergency cleanup system is available to remove messages sent by Bogart after the mass-messaging incident. This tool is designed with multiple safeguards to prevent accidental data loss and should be used with care.
+
+### How It Works
+
+The cleanup service scans all channels the bot can access and deletes messages that meet the following criteria:
+1.  **Author**: Only messages sent by Bogart are targeted.
+2.  **Timeframe**: Only messages sent within the last 48 hours (configurable) are considered.
+3.  **Permissions**: The bot must have the `Manage Messages` permission in the channel.
+
+### Safety First: Built-in Safeguards
+
+-   **Targeted Deletion**: The script **only** targets messages sent by the bot itself.
+-   **Default Dry-Run**: By default, the script runs in "dry-run" mode, showing what *would* be deleted without actually deleting anything.
+-   **Confirmation Required**: You must explicitly use `--confirm` or set `CLEANUP_MODE=true` to perform deletions.
+-   **Rate Limiting**: A delay is enforced between deletions to avoid hitting Discord's rate limits.
+
+### Usage
+
+There are three ways to run the cleanup process.
+
+#### Method 1: Startup Mode (Recommended for Docker)
+
+Set the `CLEANUP_MODE` environment variable to `true` to run the cleanup immediately on bot startup. This is the simplest method for Docker deployments.
+
+1.  **Edit your `.env` file:**
+    ```
+    DISCORD_TOKEN=your_discord_bot_token_here
+    CLEANUP_MODE=true
+    ```
+2.  **Run the bot:**
+    ```bash
+    # The cleanup will run once, and then the bot will exit.
+    docker-compose up bogart-bot --build
+    ```
+    **Note**: The container will stop after the cleanup is complete. To run the bot normally again, set `CLEANUP_MODE` back to `false`.
+
+#### Method 2: Manual CLI Script
+
+For more control, you can execute the cleanup script directly.
+
+**Docker Execution:**
+```bash
+# Run in dry-run mode to see what would be deleted
+docker-compose exec bogart-bot npm run cleanup -- --dry-run
+
+# Run in cleanup mode (with confirmation)
+docker-compose exec bogart-bot npm run cleanup -- --confirm
+```
+
+**Manual Execution:**
+```bash
+# Run in dry-run mode
+npm run cleanup -- --dry-run
+
+# Run in cleanup mode (with confirmation)
+npm run cleanup -- --confirm
+```
+
+#### Method 3: Programmatic Cleanup
+
+The `MessageCleanupService` can be used programmatically within the application for custom cleanup logic. See [`src/services/message-cleanup.service.ts`](src/services/message-cleanup.service.ts) for details.
+
+### CLI Options
+
+| Flag | Description | Default |
+| :--- | :--- | :--- |
+| `--dry-run` | Log messages that would be deleted without performing any action. | `true` (if `CLEANUP_MODE` is not `true`) |
+| `--confirm` | Confirms that you want to delete messages. Required for actual deletion. | `false` |
+| `--hours=<N>` | Sets the cleanup timeframe to the last `N` hours. | `48` |
+
+**Example:** Delete messages from the last 72 hours.
+```bash
+npm run cleanup -- --confirm --hours=72
+```
+
+### Troubleshooting
+
+- **Permission Errors**: If you see "Missing permissions" errors, ensure your bot has the `Manage Messages` permission in the affected channels.
+- **Rate Limiting**: The script includes a 1.2-second delay between deletions. If you still encounter rate-limiting issues, you may need to run the script again.
 
 ---
 

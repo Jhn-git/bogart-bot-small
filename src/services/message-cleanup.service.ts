@@ -3,16 +3,19 @@
 import { Client, TextChannel, Message, Guild, ChannelType, Snowflake, Collection } from 'discord.js';
 import { ConfigService } from './config.service';
 import { DiscordService } from './discord.service';
+import { GuildService } from './guild.service';
 import { MessageCleanupOptions, MessageCleanupResult, MessageCleanupLog } from '../types';
 
 export class MessageCleanupService {
   private client: Client;
   private configService: ConfigService;
+  private guildService: GuildService;
   private botUserId: string | null = null;
 
-  constructor(discordService: DiscordService, configService: ConfigService) {
+  constructor(discordService: DiscordService, configService: ConfigService, guildService: GuildService) {
     this.client = discordService.getClient();
     this.configService = configService;
+    this.guildService = guildService;
   }
 
   // Initialize and cache bot user ID
@@ -49,7 +52,10 @@ export class MessageCleanupService {
     let totalScanned = 0;
     let totalMatched = 0;
 
-    for (const guild of this.client.guilds.cache.values()) {
+    const allowedGuilds = this.guildService.getAllGuilds();
+    console.log(`MessageCleanupService: Operating on ${allowedGuilds.length} allowed guild(s)`);
+    
+    for (const guild of allowedGuilds) {
       for (const channel of guild.channels.cache.values()) {
         if (channel.type !== ChannelType.GuildText) continue;
         const textChannel = channel as TextChannel;

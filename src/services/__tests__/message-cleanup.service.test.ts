@@ -3,6 +3,7 @@
 import { MessageCleanupService } from '../message-cleanup.service';
 import { DiscordService } from '../discord.service';
 import { ConfigService } from '../config.service';
+import { GuildService } from '../guild.service';
 import { Client, Collection, Guild, TextChannel, Message, ChannelType, GuildChannel } from 'discord.js';
 import { MessageCleanupOptions } from '../../types';
 
@@ -60,6 +61,7 @@ describe('MessageCleanupService', () => {
   let service: MessageCleanupService;
   let mockDiscordService: jest.Mocked<DiscordService>;
   let mockConfigService: jest.Mocked<ConfigService>;
+  let mockGuildService: jest.Mocked<GuildService>;
   let mockClient: jest.Mocked<Client>;
   let mockGuild: Guild;
   let delaySpy: jest.SpyInstance;
@@ -89,7 +91,15 @@ describe('MessageCleanupService', () => {
 
     mockConfigService = new ConfigService() as jest.Mocked<ConfigService>;
 
-    service = new MessageCleanupService(mockDiscordService, mockConfigService);
+    mockGuildService = {
+      getAllGuilds: jest.fn().mockReturnValue([mockGuild]),
+      getGuildById: jest.fn(),
+      discoverGuilds: jest.fn().mockReturnValue([mockGuild]),
+      isGuildAllowed: jest.fn().mockReturnValue(true),
+      getAllowedGuildIds: jest.fn().mockReturnValue([]),
+    } as unknown as jest.Mocked<GuildService>;
+
+    service = new MessageCleanupService(mockDiscordService, mockConfigService, mockGuildService);
   });
 
   afterEach(() => {

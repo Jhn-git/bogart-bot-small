@@ -30,7 +30,7 @@ public readonly messageCleanupService: MessageCleanupService;
       this.guildService,
       this.channelDiscoveryService,
     );
-    this.messageCleanupService = new MessageCleanupService(this.discordService, this.configService);
+    this.messageCleanupService = new MessageCleanupService(this.discordService, this.configService, this.guildService);
   }
 }
 

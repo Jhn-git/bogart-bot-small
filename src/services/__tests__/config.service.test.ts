@@ -2,6 +2,9 @@ import { ConfigService } from '../config.service';
 import fs from 'fs';
 import { dump } from 'js-yaml';
 
+// Mock dotenv to prevent it from loading .env files during tests
+jest.mock('dotenv');
+
 // Since we are now mocking the service globally, we need to test the original implementation
 jest.unmock('../config.service');
 

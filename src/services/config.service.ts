@@ -9,11 +9,13 @@ export class ConfigService {
   constructor() {
     dotenv.config();
 
-    // Debug logging
-    console.log('=== ConfigService Debug ===');
-    console.log('Working directory:', process.cwd());
-    console.log('QUOTES_FILE env var:', process.env.QUOTES_FILE);
-    console.log('NODE_ENV:', process.env.NODE_ENV);
+    // Debug logging (only in development)
+    if (process.env.NODE_ENV === 'development') {
+      console.log('=== ConfigService Debug ===');
+      console.log('Working directory:', process.cwd());
+      console.log('QUOTES_FILE env var:', process.env.QUOTES_FILE);
+      console.log('NODE_ENV:', process.env.NODE_ENV);
+    }
 
     let quotesPath = process.env.QUOTES_FILE || 'data/quotes.yaml';
     
@@ -26,11 +28,15 @@ export class ConfigService {
         '../data/quotes.yaml'
       ];
       
-      console.log(`Initial path ${quotesPath} not found, trying alternatives...`);
+      if (process.env.NODE_ENV === 'development') {
+        console.log(`Initial path ${quotesPath} not found, trying alternatives...`);
+      }
       
       for (const altPath of alternativePaths) {
         if (fs.existsSync(altPath)) {
-          console.log(`Found quotes file at: ${altPath}`);
+          if (process.env.NODE_ENV === 'development') {
+            console.log(`Found quotes file at: ${altPath}`);
+          }
           quotesPath = altPath;
           break;
         }
@@ -44,19 +50,47 @@ export class ConfigService {
       }
     }
     
-    console.log(`Loading quotes from: ${quotesPath}`);
+    if (process.env.NODE_ENV === 'development') {
+      console.log(`Loading quotes from: ${quotesPath}`);
+    }
     const quotesFile = fs.readFileSync(quotesPath, 'utf8');
     const quotes = yaml.load(quotesFile) as Quotes;
 
-    this.config = {
-      discordToken: process.env.DISCORD_TOKEN || '',
-      quotes,
-      cleanupMaxMessages: parseInt(process.env.CLEANUP_MAX_MESSAGES_PER_CHANNEL || '100', 10),
-    };
-
-    if (!this.config.discordToken) {
+    // Validate environment variables
+    const discordToken = process.env.DISCORD_TOKEN?.trim();
+    if (!discordToken) {
       throw new Error('DISCORD_TOKEN is not defined in the environment variables.');
     }
+
+    // Validate cleanup max messages
+    const cleanupMaxMessagesStr = process.env.CLEANUP_MAX_MESSAGES_PER_CHANNEL || '100';
+    const cleanupMaxMessages = parseInt(cleanupMaxMessagesStr, 10);
+    if (isNaN(cleanupMaxMessages) || cleanupMaxMessages < 1 || cleanupMaxMessages > 1000) {
+      throw new Error(`CLEANUP_MAX_MESSAGES_PER_CHANNEL must be a number between 1 and 1000, got: ${cleanupMaxMessagesStr}`);
+    }
+
+    // Validate quotes structure
+    if (!quotes || typeof quotes !== 'object') {
+      throw new Error('Invalid quotes configuration: quotes must be an object');
+    }
+
+    if (!Array.isArray(quotes.generic_wandering_messages)) {
+      throw new Error('Invalid quotes configuration: generic_wandering_messages must be an array');
+    }
+
+    if (quotes.generic_wandering_messages.length === 0) {
+      throw new Error('Invalid quotes configuration: generic_wandering_messages cannot be empty');
+    }
+
+    if (quotes.goblin_wandering_messages && typeof quotes.goblin_wandering_messages !== 'object') {
+      throw new Error('Invalid quotes configuration: goblin_wandering_messages must be an object');
+    }
+
+    this.config = {
+      discordToken,
+      quotes,
+      cleanupMaxMessages,
+    };
   }
 
   public get<K extends keyof Config>(key: K): Config[K] {

@@ -32,16 +32,19 @@ export class DiscordService {
   public async sendMessage(
     channelId: string,
     message: string,
-  ): Promise<void> {
+  ): Promise<boolean> {
     try {
       const channel = await this.client.channels.fetch(channelId);
       if (channel instanceof TextChannel) {
         await channel.send(message);
+        return true;
       } else {
         console.warn(`Channel ${channelId} is not a text channel.`);
+        return false;
       }
     } catch (error) {
       console.error(`Failed to send message to channel ${channelId}:`, error);
+      return false;
     }
   }
 

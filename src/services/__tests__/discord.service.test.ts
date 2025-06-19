@@ -38,7 +38,7 @@ describe('DiscordService', () => {
   });
 
   it('should not send a message if the channel is not a text channel', async () => {
-    (mockClient.channels.fetch as jest.Mock).mockResolvedValue({} as any);
+    (mockClient.channels.fetch as jest.Mock).mockResolvedValue({} as unknown);
     const consoleWarnSpy = jest
       .spyOn(console, 'warn')
       .mockImplementation(() => {});

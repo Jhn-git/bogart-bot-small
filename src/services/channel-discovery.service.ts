@@ -22,13 +22,18 @@ export class ChannelDiscoveryService {
    * Applies naming patterns, permission checks, and channel type validation.
    */
   public discoverEligibleChannels(guild: Guild): TextChannel[] {
-    return guild.channels.cache
-      .filter(
-        (channel) =>
-          channel.type === ChannelType.GuildText &&
-          this.isChannelEligible(channel as TextChannel)
-      )
-      .map((channel) => channel as TextChannel);
+    try {
+      return guild.channels.cache
+        .filter(
+          (channel) =>
+            channel.type === ChannelType.GuildText &&
+            this.isChannelEligible(channel as TextChannel)
+        )
+        .map((channel) => channel as TextChannel);
+    } catch (error) {
+      console.error(`Error discovering channels in guild ${guild.name} (${guild.id}):`, error);
+      return [];
+    }
   }
 
   /**
@@ -38,28 +43,33 @@ export class ChannelDiscoveryService {
    * - Applies naming pattern (e.g., contains 'general', 'bot', or 'chat')
    */
   private isChannelEligible(channel: TextChannel): boolean {
-    // Permission: Bot must be able to send messages
-    const permissions = channel.permissionsFor(channel.guild.members.me!);
-    if (!permissions?.has(PermissionsBitField.Flags.SendMessages)) {
+    try {
+      // Permission: Bot must be able to send messages
+      const permissions = channel.permissionsFor(channel.guild.members.me!);
+      if (!permissions?.has(PermissionsBitField.Flags.SendMessages)) {
+        return false;
+      }
+
+      // NSFW filter
+      if (channel.nsfw) {
+        return false;
+      }
+
+      // Naming pattern (customize as needed)
+      const name = channel.name.toLowerCase();
+      const allowedPatterns = ['general', 'bot', 'chat', 'talk', 'quotes'];
+      const isAllowed =
+        allowedPatterns.some((pattern) => name.includes(pattern)) ||
+        this.specialChannelNames.includes(name);
+
+      if (!isAllowed) {
+        return false;
+      }
+
+      return true;
+    } catch (error) {
+      console.warn(`Error checking channel eligibility for ${channel.name} (${channel.id}):`, error);
       return false;
     }
-
-    // NSFW filter
-    if (channel.nsfw) {
-      return false;
-    }
-
-    // Naming pattern (customize as needed)
-    const name = channel.name.toLowerCase();
-    const allowedPatterns = ['general', 'bot', 'chat', 'talk', 'quotes'];
-    const isAllowed =
-      allowedPatterns.some((pattern) => name.includes(pattern)) ||
-      this.specialChannelNames.includes(name);
-
-    if (!isAllowed) {
-      return false;
-    }
-
-    return true;
   }
 }

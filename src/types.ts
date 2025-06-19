@@ -3,7 +3,7 @@ export interface Quotes {
   goblin_wandering_messages: {
     [key: string]: string[];
   };
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
 export interface Config {

@@ -35,6 +35,13 @@ async function gracefulShutdown(signal: string) {
 async function main() {
   console.log('Starting Bogart Discord Bot...');
 
+  // Check for deprecated CLEANUP_MODE environment variable
+  if (process.env.CLEANUP_MODE === 'true') {
+    console.warn('⚠️  WARNING: CLEANUP_MODE is deprecated and no longer supported in bot startup.');
+    console.warn('   To run message cleanup, use: npm run cleanup -- --confirm');
+    console.warn('   Remove CLEANUP_MODE from your .env file to eliminate this warning.');
+  }
+
   // Set up signal handlers for graceful shutdown
   process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
   process.on('SIGINT', () => gracefulShutdown('SIGINT'));

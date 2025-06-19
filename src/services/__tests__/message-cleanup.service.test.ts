@@ -184,9 +184,11 @@ describe('MessageCleanupService', () => {
       const options: MessageCleanupOptions = { dryRun: true };
       const result = await service.cleanupMessages(options);
 
-      expect(result.errors.length).toBe(1);
-      expect(result.errors[0].action).toBe('skip');
-      expect(result.errors[0].reason).toContain('Missing permissions');
+      // With the new pre-filtering logic, channels without permissions are filtered out
+      // before processing, so no errors are logged for them
+      expect(result.errors.length).toBe(0);
+      expect(result.scanned).toBe(0);
+      expect(result.matched).toBe(0);
     });
 
     it('should call the delay function between deletions', async () => {

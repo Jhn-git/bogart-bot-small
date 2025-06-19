@@ -120,7 +120,7 @@ describe('Full End-to-End Multi-Guild Integration Test', () => {
     mockClient = mockDiscordService.getClient() as jest.Mocked<Client>;
 
     // Spy on sendMessage and mock its implementation
-    jest.spyOn(mockDiscordService, 'sendMessage').mockResolvedValue(undefined);
+    jest.spyOn(mockDiscordService, 'sendMessage').mockResolvedValue(true);
   });
 
   it('should validate the complete multi-guild workflow without ALLOWED_GUILD_IDS restrictions', async () => {

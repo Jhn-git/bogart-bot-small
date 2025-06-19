@@ -111,16 +111,16 @@ describe('WanderingService', () => {
       const channels1 = [{ id: 'c1', name: 'general' }] as TextChannel[];
       mockGuildService.getAllGuilds.mockReturnValue([guild1]);
       mockChannelDiscoveryService.discoverEligibleChannels.mockReturnValue(channels1);
-      mockDiscordService.sendMessage.mockRejectedValue(new Error('Discord API Error'));
+      mockDiscordService.sendMessage.mockResolvedValue(false);
 
-      const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+      const consoleWarnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
 
       wanderingService.start();
       await jest.advanceTimersByTimeAsync(12 * 60 * 60 * 1000);
 
       expect(mockDiscordService.sendMessage).toHaveBeenCalledTimes(1);
-      expect(consoleErrorSpy).toHaveBeenCalled();
-      consoleErrorSpy.mockRestore();
+      expect(consoleWarnSpy).toHaveBeenCalled();
+      consoleWarnSpy.mockRestore();
     });
 
     it('should not send messages if the client is not ready', async () => {

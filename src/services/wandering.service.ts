@@ -6,6 +6,8 @@ import { ChannelDiscoveryService } from './channel-discovery.service';
 
 const WANDERING_INTERVAL = 12 * 60 * 60 * 1000; // 12 hours
 const PER_GUILD_RATE_LIMIT = 6 * 60 * 60 * 1000; // 6 hours per guild
+const TIMESTAMP_CLEANUP_INTERVAL = 24 * 60 * 60 * 1000; // 24 hours - cleanup old timestamps
+const TIMESTAMP_MAX_AGE = 7 * 24 * 60 * 60 * 1000; // 7 days - max age for stored timestamps
 
 export class WanderingService {
   private discordService: DiscordService;
@@ -13,6 +15,7 @@ export class WanderingService {
   private guildService: GuildService;
   private channelDiscoveryService: ChannelDiscoveryService;
   private intervalId: NodeJS.Timeout | null = null;
+  private cleanupIntervalId: NodeJS.Timeout | null = null;
   private lastMessageTimestamps: Map<string, number> = new Map();
 
   constructor(
@@ -35,6 +38,9 @@ export class WanderingService {
 
     console.log(`Starting WanderingService with ${WANDERING_INTERVAL / 1000 / 60 / 60} hour interval`);
     this.intervalId = setInterval(() => this.sendWanderingMessages(), WANDERING_INTERVAL);
+    
+    // Start timestamp cleanup interval to prevent memory leaks
+    this.cleanupIntervalId = setInterval(() => this.cleanupOldTimestamps(), TIMESTAMP_CLEANUP_INTERVAL);
   }
 
   public stop(): void {
@@ -42,6 +48,11 @@ export class WanderingService {
       console.log('Stopping WanderingService...');
       clearInterval(this.intervalId);
       this.intervalId = null;
+    }
+    
+    if (this.cleanupIntervalId) {
+      clearInterval(this.cleanupIntervalId);
+      this.cleanupIntervalId = null;
     }
   }
 
@@ -71,17 +82,38 @@ export class WanderingService {
         const channel = shuffled[0];
         const message = this.quoteService.getWanderingMessage(channel.name);
         if (message) {
-          try {
-            await this.discordService.sendMessage(channel.id, message);
+          const success = await this.discordService.sendMessage(channel.id, message);
+          if (success) {
             this.lastMessageTimestamps.set(guild.id, now);
-          } catch (error) {
-            console.error(
-              `Failed to send wandering message to ${channel.name} in ${guild.name}:`,
-              error,
+          } else {
+            console.warn(
+              `Could not send wandering message to ${channel.name} in ${guild.name}`,
             );
           }
         }
       }
+    }
+  }
+
+  /**
+   * Cleanup old timestamps to prevent memory leaks
+   */
+  private cleanupOldTimestamps(): void {
+    const now = Date.now();
+    const expiredKeys: string[] = [];
+    
+    for (const [guildId, timestamp] of this.lastMessageTimestamps.entries()) {
+      if (now - timestamp > TIMESTAMP_MAX_AGE) {
+        expiredKeys.push(guildId);
+      }
+    }
+    
+    for (const key of expiredKeys) {
+      this.lastMessageTimestamps.delete(key);
+    }
+    
+    if (expiredKeys.length > 0) {
+      console.log(`WanderingService: Cleaned up ${expiredKeys.length} old timestamp entries`);
     }
   }
 

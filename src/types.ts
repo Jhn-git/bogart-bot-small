@@ -41,3 +41,15 @@ export interface MessageCleanupResult {
   dryRun: boolean;
   confirm: boolean;
 }
+
+export interface IStatusService {
+  start(): void;
+  stop(): void;
+  onGuildCountChange(): void;
+  getStatus(): {
+    isActive: boolean;
+    currentServerCount: number;
+    isShowingGoblinMessage: boolean;
+    lastGoblinMessage: string | null;
+  };
+}

@@ -26,7 +26,7 @@ export class ConfigService {
         '/app/data/quotes.yaml',
         './data/quotes.yaml',
         '../data/quotes.yaml'
-      ];
+      ] as const;
       
       if (process.env.NODE_ENV === 'development') {
         console.log(`Initial path ${quotesPath} not found, trying alternatives...`);

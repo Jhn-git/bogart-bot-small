@@ -367,15 +367,20 @@ export class WanderingService {
       let messages;
       try {
         messages = await channel.messages.fetch({ limit: MESSAGE_HISTORY_COUNT });
-      } catch (fetchError: any) {
+      } catch (fetchError: unknown) {
         // Handle specific Discord API errors more gracefully
         if (process.env.NODE_ENV !== 'test') {
-          if (fetchError.code === 50001) {
-            console.log(`⚠️  Missing Access to fetch messages in ${channel.name} (${guild.name}): Permission check passed but API call failed`);
-          } else if (fetchError.code === 50013) {
-            console.log(`⚠️  Missing Permissions to fetch messages in ${channel.name} (${guild.name})`);
+          if (fetchError instanceof Error && 'code' in fetchError) {
+            const discordError = fetchError as Error & { code: number };
+            if (discordError.code === 50001) {
+              console.log(`⚠️  Missing Access to fetch messages in ${channel.name} (${guild.name}): Permission check passed but API call failed`);
+            } else if (discordError.code === 50013) {
+              console.log(`⚠️  Missing Permissions to fetch messages in ${channel.name} (${guild.name})`);
+            } else {
+              console.warn(`⚠️  Error fetching messages in ${channel.name} (${guild.name}):`, discordError.message);
+            }
           } else {
-            console.warn(`⚠️  Error fetching messages in ${channel.name} (${guild.name}):`, fetchError.message);
+            console.warn(`⚠️  Unknown error fetching messages in ${channel.name} (${guild.name}):`, fetchError);
           }
         }
         return null;

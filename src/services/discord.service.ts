@@ -1,5 +1,6 @@
 import { Client, GatewayIntentBits, TextChannel } from 'discord.js';
 import { ConfigService } from './config.service';
+import { IStatusService } from '../types';
 
 export class DiscordService {
   private client: Client;
@@ -7,7 +8,7 @@ export class DiscordService {
   private lastMessageTime: number = 0;
   private messagesSent: number = 0;
   private messageSendingDisabled: boolean = false;
-  private statusService: any = null; // Will be set via dependency injection
+  private statusService: IStatusService | null = null;
 
   constructor(configService: ConfigService) {
     this.configService = configService;
@@ -117,7 +118,7 @@ export class DiscordService {
     return this.client;
   }
 
-  public setStatusService(statusService: any): void {
+  public setStatusService(statusService: IStatusService): void {
     this.statusService = statusService;
   }
 }

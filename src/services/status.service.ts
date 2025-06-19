@@ -22,7 +22,7 @@ export class StatusService {
     '🔍 Exploring {count} mysterious places',
     '🎪 Entertaining goblins in {count} kingdoms',
     '🗝️ Finding secrets in {count} dungeons'
-  ];
+  ] as const;
 
   constructor(discordService: DiscordService) {
     this.discordService = discordService;

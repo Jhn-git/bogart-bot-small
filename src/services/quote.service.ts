@@ -13,7 +13,6 @@ export class QuoteService {
     placeholders?: Record<string, string>,
   ): string {
     console.log(`Getting wandering message for channel: ${channelName}`);
-    console.log('Available quotes:', this.quotes);
     
     // First check channel-specific messages
     const channelSpecific = this.quotes.channel_specific_wandering_messages;

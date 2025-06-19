@@ -42,7 +42,7 @@ channel_specific_wandering_messages: {}
 `;
     // Make the mock aware of the file being accessed
     mockFs.existsSync.mockImplementation((path) => {
-      if (path === 'data/quotes.yaml' || path === 'cooldowns.json') {
+      if (path === 'data/quotes.yaml' || path.toString().includes('cooldowns.json') || path === 'data') {
         return true;
       }
       return false;
@@ -51,13 +51,14 @@ channel_specific_wandering_messages: {}
       if (path === 'data/quotes.yaml') {
         return mockYaml;
       }
-      if (path === 'cooldowns.json') {
+      if (path.toString().includes('cooldowns.json')) {
         return '{}'; // Return empty JSON for cooldowns
       }
       return '';
     });
     mockFs.writeFileSync.mockImplementation(() => {});
     mockFs.renameSync.mockImplementation(() => {});
+    mockFs.mkdirSync.mockImplementation(() => undefined);
 
     mockClient = {
       isReady: jest.fn().mockReturnValue(true),
@@ -421,8 +422,8 @@ channel_specific_wandering_messages: {}
           mockChannelDiscoveryService
         );
 
-        expect(fs.existsSync).toHaveBeenCalledWith('cooldowns.json');
-        expect(fs.readFileSync).toHaveBeenCalledWith('cooldowns.json', 'utf8');
+        expect(fs.existsSync).toHaveBeenCalledWith(expect.stringContaining('cooldowns.json'));
+        expect(fs.readFileSync).toHaveBeenCalledWith(expect.stringContaining('cooldowns.json'), 'utf8');
         
         // Clean up the new service
         newService.stop();
@@ -449,14 +450,14 @@ channel_specific_wandering_messages: {}
 
         // Should save cooldowns after sending message
         expect(fs.writeFileSync).toHaveBeenCalled();
-        expect(fs.renameSync).toHaveBeenCalledWith('cooldowns.json.tmp', 'cooldowns.json');
+        expect(fs.renameSync).toHaveBeenCalledWith(expect.stringContaining('cooldowns.json.tmp'), expect.stringContaining('cooldowns.json'));
       });
 
       it('should save cooldowns on service stop', () => {
         wanderingService.stop();
         
         expect(fs.writeFileSync).toHaveBeenCalled();
-        expect(fs.renameSync).toHaveBeenCalledWith('cooldowns.json.tmp', 'cooldowns.json');
+        expect(fs.renameSync).toHaveBeenCalledWith(expect.stringContaining('cooldowns.json.tmp'), expect.stringContaining('cooldowns.json'));
       });
 
       it('should handle corrupted cooldowns file gracefully', () => {

@@ -58,7 +58,7 @@ const TIMESTAMP_CLEANUP_INTERVAL = 24 * 60 * 60 * 1000; // 24 hours - cleanup ol
 const TIMESTAMP_MAX_AGE = 7 * 24 * 60 * 60 * 1000; // 7 days - max age for stored timestamps
 
 // Persistence Constants
-const COOLDOWNS_FILE = '/app/data/cooldowns.json';
+const COOLDOWNS_FILE = process.env.COOLDOWNS_FILE || path.join(process.cwd(), 'data', 'cooldowns.json');
 
 export class WanderingService {
   private discordService: DiscordService;
@@ -621,6 +621,12 @@ export class WanderingService {
       // Convert Map to plain object for JSON serialization
       for (const [guildId, timestamp] of this.lastMessageTimestamps.entries()) {
         cooldownsData[guildId] = timestamp;
+      }
+      
+      // Ensure the directory exists
+      const cooldownsDir = path.dirname(COOLDOWNS_FILE);
+      if (!fs.existsSync(cooldownsDir)) {
+        fs.mkdirSync(cooldownsDir, { recursive: true });
       }
       
       // Write atomically by writing to temp file first, then renaming

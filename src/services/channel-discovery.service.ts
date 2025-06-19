@@ -87,14 +87,15 @@ export class ChannelDiscoveryService {
 
       // Check for obvious conversation channels (these get priority)
       const conversationPatterns = [
-        'general', 'chat', 'talk', 'random', 'off-topic', 'offtopic', 'casual', 
+        'general', 'chat', 'talk', 'random', 'off-topic', 'offtopic', 'casual',
         'lounge', 'hangout', 'social', 'community', 'discussion', 'misc', 'miscellaneous'
       ];
+      const allowedPatterns = ['bot-commands'];
       
       const isConversationChannel = conversationPatterns.some((pattern) => name.includes(pattern));
-      
-      // Allow conversation channels and any other channel not explicitly blocked
-      return true;
+      const isAllowedPattern = allowedPatterns.some((pattern) => name.includes(pattern));
+
+      return isSpecialChannel || isConversationChannel || isAllowedPattern;
     } catch (error) {
       console.warn(`Error checking channel eligibility for ${channel.name} (${channel.id}):`, error);
       return false;

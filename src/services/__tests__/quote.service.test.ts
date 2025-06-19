@@ -12,6 +12,7 @@ describe('QuoteService', () => {
     goblin_wandering_messages: {
       'goblin-cave': ['goblin message'],
     },
+    channel_specific_wandering_messages: {},
   };
 
   beforeEach(() => {
@@ -34,6 +35,7 @@ describe('QuoteService', () => {
     const mockLocalQuotes: Quotes = {
       generic_wandering_messages: messages,
       goblin_wandering_messages: {},
+      channel_specific_wandering_messages: {},
     };
     (mockConfigService.get as jest.Mock).mockReturnValue(mockLocalQuotes);
     const quoteServiceNew = new QuoteService(mockConfigService);
@@ -45,6 +47,7 @@ describe('QuoteService', () => {
     const mockLocalQuotes: Quotes = {
       generic_wandering_messages: ['hello {placeholder}'],
       goblin_wandering_messages: {},
+      channel_specific_wandering_messages: {},
     };
     (mockConfigService.get as jest.Mock).mockReturnValue(mockLocalQuotes);
     const quoteServiceNew = new QuoteService(mockConfigService);

@@ -3,6 +3,9 @@ export interface Quotes {
   goblin_wandering_messages: {
     [key: string]: string[];
   };
+  channel_specific_wandering_messages: {
+    [key: string]: string[];
+  };
   [key: string]: unknown;
 }
 

@@ -77,8 +77,12 @@ describe('MessageCleanupService', () => {
       name: 'Test Guild',
       channels: {
         cache: new Collection<string, GuildChannel>(),
+        fetch: jest.fn().mockResolvedValue(new Collection()),
       },
     } as unknown as Guild;
+
+    // Mock the fetch method to return the guild itself, as per discord.js behavior
+    (mockGuild as any).fetch = jest.fn().mockResolvedValue(mockGuild);
 
     mockClient = {
       guilds: { cache: new Collection<string, Guild>([['guild-1', mockGuild]]) },

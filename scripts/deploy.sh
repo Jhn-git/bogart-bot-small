@@ -64,7 +64,121 @@ check_prerequisites() {
     print_success "Prerequisites check completed"
 }
 
-# Function to deploy (single mode)
+# Function to check git prerequisites for merge operations
+check_git_prerequisites() {
+    if ! command -v git &> /dev/null; then
+        print_error "Git is not installed or not in PATH"
+        exit 1
+    fi
+    
+    if ! git rev-parse --git-dir &> /dev/null; then
+        print_error "Not in a Git repository"
+        exit 1
+    fi
+}
+
+# Function to safely merge develop to main
+safe_merge() {
+    print_status "Starting safe merge of develop → main..."
+    check_git_prerequisites
+    
+    # Check for uncommitted changes
+    if ! git diff --quiet || ! git diff --cached --quiet; then
+        print_error "Working directory has uncommitted changes. Please commit or stash them first."
+        exit 1
+    fi
+    
+    # Get current branch
+    current_branch=$(git branch --show-current)
+    print_status "Current branch: $current_branch"
+    
+    # Fetch latest from origin
+    print_status "Fetching latest from origin..."
+    git fetch origin
+    
+    # Check if develop has commits ahead of main
+    develop_commits=$(git rev-list --count origin/main..origin/develop 2>/dev/null || echo "0")
+    if [ "$develop_commits" -eq "0" ]; then
+        print_warning "No new commits to merge from develop to main"
+        return 0
+    fi
+    
+    print_status "Found $develop_commits new commit(s) to merge from develop"
+    
+    # Show what will be merged
+    print_status "Commits to be merged:"
+    git log --oneline origin/main..origin/develop | head -10
+    if [ "$develop_commits" -gt "10" ]; then
+        print_status "... and $((develop_commits - 10)) more commits"
+    fi
+    
+    # Create backup of current state
+    backup_branch="backup-main-$(date +%Y%m%d-%H%M%S)"
+    print_status "Creating backup branch: $backup_branch"
+    git branch "$backup_branch" origin/main
+    
+    # Switch to main and merge
+    print_status "Switching to main branch..."
+    git checkout main
+    
+    print_status "Pulling latest main..."
+    git pull origin main
+    
+    print_status "Merging develop into main..."
+    if ! git merge origin/develop --no-ff -m "🔀 Merge develop into main via deploy script"; then
+        print_error "Merge failed! Restoring from backup..."
+        git merge --abort 2>/dev/null || true
+        git reset --hard "$backup_branch"
+        git branch -D "$backup_branch"
+        git checkout "$current_branch" 2>/dev/null || true
+        exit 1
+    fi
+    
+    # Validate the merge by building
+    print_status "Validating merge by running build..."
+    if ! npm run build; then
+        print_error "Build failed after merge! Rolling back..."
+        git reset --hard "$backup_branch"
+        git branch -D "$backup_branch"
+        git checkout "$current_branch" 2>/dev/null || true
+        exit 1
+    fi
+    
+    # Push to origin
+    print_status "Pushing merged main to origin..."
+    git push origin main
+    
+    # Clean up backup and return to original branch
+    git branch -D "$backup_branch"
+    if [ "$current_branch" != "main" ]; then
+        git checkout "$current_branch"
+    fi
+    
+    print_success "Successfully merged develop → main!"
+    print_status "Merged $develop_commits commit(s)"
+}
+
+# Function to show container logs with nice formatting
+show_deployment_logs() {
+    print_status "🚀 Deployment complete! Following logs (Press Ctrl+C to stop)..."
+    echo ""
+    
+    # Wait a moment for containers to fully start
+    sleep 2
+    
+    if ! docker compose ps | grep -q "bogart-bot.*Up"; then
+        print_warning "Container not running yet. Check status with: $0 status"
+        return 1
+    fi
+    
+    print_status "Last 20 lines of existing logs:"
+    docker compose logs --tail=20 bogart-bot
+    echo ""
+    print_status "--- Following live logs (new messages will appear below) ---"
+    docker compose logs -f bogart-bot
+}
+
+# Function to deploy (single mode) with automatic log viewing
 deploy() {
     print_status "Deploying using docker-compose.yml..."
     check_prerequisites
@@ -73,8 +187,18 @@ deploy() {
     print_success "Deployment completed!"
     print_status "Container status:"
     docker compose ps
-    print_status "To view logs: docker compose logs -f bogart-bot-prod"
-    print_status "To stop: docker compose down"
+    echo ""
+    
+    # Automatically show logs after deployment
+    show_deployment_logs
+}
+
+# Function to merge and deploy in one command
+merge_deploy() {
+    print_status "Starting merge + deploy workflow..."
+    safe_merge
+    echo ""
+    deploy
 }
 
 # Function to stop services
@@ -87,6 +211,10 @@ stop_services() {
 # Function to show logs
 show_logs() {
     print_status "Showing logs..."
+    if ! docker compose ps | grep -q "bogart-bot.*Up"; then
+        print_warning "No running containers found. Deploy first with: $0 deploy"
+        return 1
+    fi
     docker compose logs -f bogart-bot
 }
 
@@ -143,7 +271,9 @@ show_help() {
     echo "Usage: $0 [COMMAND]"
     echo ""
     echo "Commands:"
-    echo "  deploy             Deploy using docker-compose.yml"
+    echo "  deploy             Deploy using docker-compose.yml (shows logs automatically)"
+    echo "  merge              Safely merge develop → main"
+    echo "  merge-deploy       Merge develop → main and deploy in one command"
     echo "  stop               Stop all services"
     echo "  logs               Show logs"
     echo "  status             Show service status"
@@ -152,10 +282,15 @@ show_help() {
     echo "  backup             Backup configuration files"
     echo "  help               Show this help message"
     echo ""
+    echo "Git Workflow Commands:"
+    echo "  merge              - Safely merge develop into main with validation"
+    echo "  merge-deploy       - Complete workflow: merge + deploy + show logs"
+    echo ""
     echo "Examples:"
-    echo "  $0 deploy          # Deploy using docker-compose.yml"
-    echo "  $0 logs            # Show logs"
-    echo "  $0 update          # Update deployment"
+    echo "  $0 merge-deploy    # Merge develop→main, deploy, and show logs"
+    echo "  $0 deploy          # Deploy and show logs"
+    echo "  $0 merge           # Just merge develop→main safely"
+    echo "  $0 logs            # Show container logs"
     echo ""
 }
 
@@ -163,6 +298,12 @@ show_help() {
 case "${1:-help}" in
     "deploy")
         deploy
+        ;;
+    "merge")
+        safe_merge
+        ;;
+    "merge-deploy")
+        merge_deploy
         ;;
     "stop")
         stop_services

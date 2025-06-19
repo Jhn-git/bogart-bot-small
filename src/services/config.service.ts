@@ -69,6 +69,9 @@ export class ConfigService {
       throw new Error(`CLEANUP_MAX_MESSAGES_PER_CHANNEL must be a number between 1 and 1000, got: ${cleanupMaxMessagesStr}`);
     }
 
+    // Get bot owner ID (optional)
+    const botOwnerId = process.env.BOT_OWNER_ID?.trim();
+
     // Validate quotes structure
     if (!quotes || typeof quotes !== 'object') {
       throw new Error('Invalid quotes configuration: quotes must be an object');
@@ -90,6 +93,7 @@ export class ConfigService {
       discordToken,
       quotes,
       cleanupMaxMessages,
+      botOwnerId,
     };
   }
 

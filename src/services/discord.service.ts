@@ -2,6 +2,13 @@ import { Client, GatewayIntentBits, TextChannel } from 'discord.js';
 import { ConfigService } from './config.service';
 import { IStatusService } from '../types';
 
+// Forward declaration to avoid circular dependency
+export interface INotificationService {
+  notifyBotOwnerOnGuildJoin(guild: any): Promise<void>;
+  notifyBotOwnerOnGuildLeave(guild: any): Promise<void>;
+  checkAndNotifyGuildOwnerOnJoin(guild: any): Promise<void>;
+}
+
 export class DiscordService {
   private client: Client;
   private configService: ConfigService;
@@ -9,6 +16,7 @@ export class DiscordService {
   private messagesSent: number = 0;
   private messageSendingDisabled: boolean = false;
   private statusService: IStatusService | null = null;
+  private notificationService: INotificationService | null = null;
 
   constructor(configService: ConfigService) {
     this.configService = configService;
@@ -26,7 +34,7 @@ export class DiscordService {
       }
     });
 
-    this.client.on('guildCreate', (guild) => {
+    this.client.on('guildCreate', async (guild) => {
       console.log(`Joined new server: ${guild.name} (${guild.id})`);
       console.log(`Now active in ${this.client.guilds.cache.size} servers`);
       
@@ -34,15 +42,36 @@ export class DiscordService {
       if (this.statusService && typeof this.statusService.onGuildCountChange === 'function') {
         this.statusService.onGuildCountChange();
       }
+
+      // Send notifications
+      if (this.notificationService) {
+        try {
+          await Promise.all([
+            this.notificationService.notifyBotOwnerOnGuildJoin(guild),
+            this.notificationService.checkAndNotifyGuildOwnerOnJoin(guild)
+          ]);
+        } catch (error) {
+          console.error('Error sending guild join notifications:', error);
+        }
+      }
     });
 
-    this.client.on('guildDelete', (guild) => {
+    this.client.on('guildDelete', async (guild) => {
       console.log(`Left server: ${guild.name} (${guild.id})`);
       console.log(`Now active in ${this.client.guilds.cache.size} servers`);
       
       // Notify status service of guild count change
       if (this.statusService && typeof this.statusService.onGuildCountChange === 'function') {
         this.statusService.onGuildCountChange();
+      }
+
+      // Send bot owner notification
+      if (this.notificationService) {
+        try {
+          await this.notificationService.notifyBotOwnerOnGuildLeave(guild);
+        } catch (error) {
+          console.error('Error sending guild leave notification:', error);
+        }
       }
     });
 
@@ -120,5 +149,9 @@ export class DiscordService {
 
   public setStatusService(statusService: IStatusService): void {
     this.statusService = statusService;
+  }
+
+  public setNotificationService(notificationService: INotificationService): void {
+    this.notificationService = notificationService;
   }
 }

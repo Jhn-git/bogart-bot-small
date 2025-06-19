@@ -6,6 +6,7 @@ import { GuildService } from './services/guild.service';
 import { ChannelDiscoveryService } from './services/channel-discovery.service';
 import { MessageCleanupService } from './services/message-cleanup.service';
 import { StatusService } from './services/status.service';
+import { NotificationService } from './services/notification.service';
 
 class Container {
   public readonly configService: ConfigService;
@@ -15,6 +16,7 @@ class Container {
   public readonly channelDiscoveryService: ChannelDiscoveryService;
   public readonly messageCleanupService: MessageCleanupService;
   public readonly statusService: StatusService;
+  public readonly notificationService: NotificationService;
   public readonly wanderingService: WanderingService;
 
   constructor() {
@@ -27,6 +29,11 @@ class Container {
     this.guildService = new GuildService(this.discordService);
     this.channelDiscoveryService = new ChannelDiscoveryService(this.configService);
     this.statusService = new StatusService(this.discordService);
+    this.notificationService = new NotificationService(
+      this.discordService,
+      this.channelDiscoveryService,
+      this.configService
+    );
     this.wanderingService = new WanderingService(
       this.discordService,
       this.quoteService,
@@ -35,8 +42,9 @@ class Container {
     );
     this.messageCleanupService = new MessageCleanupService(this.discordService, this.configService, this.guildService);
     
-    // Wire up status service to discord service
+    // Wire up services to discord service
     this.discordService.setStatusService(this.statusService);
+    this.discordService.setNotificationService(this.notificationService);
   }
 }
 

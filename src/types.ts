@@ -13,6 +13,7 @@ export interface Config {
   discordToken: string;
   quotes: Quotes;
   cleanupMaxMessages: number;
+  botOwnerId?: string;
 }
 export interface MessageCleanupOptions {
   dryRun?: boolean;

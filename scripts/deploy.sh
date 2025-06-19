@@ -77,6 +77,40 @@ check_git_prerequisites() {
     fi
 }
 
+# Function to run pre-merge tests
+run_pre_merge_tests() {
+    print_status "Running pre-merge tests on develop branch..."
+    
+    # Switch to develop temporarily to run tests
+    local current_branch=$(git branch --show-current)
+    git checkout develop
+    
+    # Pull latest develop
+    print_status "Pulling latest develop for testing..."
+    git pull origin develop
+    
+    # Run tests
+    print_status "Running test suite..."
+    if ! npm test; then
+        print_error "Tests failed on develop branch. Merge aborted."
+        git checkout "$current_branch" 2>/dev/null || true
+        return 1
+    fi
+    
+    # Run build validation
+    print_status "Running build validation..."
+    if ! npm run build; then
+        print_error "Build failed on develop branch. Merge aborted."
+        git checkout "$current_branch" 2>/dev/null || true
+        return 1
+    fi
+    
+    # Return to original branch
+    git checkout "$current_branch"
+    print_success "Pre-merge tests passed!"
+    return 0
+}
+
 # Function to safely merge develop to main
 safe_merge() {
     print_status "Starting safe merge of develop → main..."
@@ -85,6 +119,12 @@ safe_merge() {
     # Check for uncommitted changes
     if ! git diff --quiet || ! git diff --cached --quiet; then
         print_error "Working directory has uncommitted changes. Please commit or stash them first."
+        exit 1
+    fi
+    
+    # Run pre-merge tests
+    if ! run_pre_merge_tests; then
+        print_error "Pre-merge tests failed. Merge aborted."
         exit 1
     fi
     
@@ -175,10 +215,117 @@ show_deployment_logs() {
     docker compose logs -f bogart-bot
 }
 
+# Function to save deployment state for rollback
+save_deployment_state() {
+    local state_dir=".deploy_state"
+    mkdir -p "$state_dir"
+    
+    # Save current git commit
+    git rev-parse HEAD > "$state_dir/last_commit"
+    
+    # Save deployment timestamp
+    date +"%Y-%m-%d %H:%M:%S" > "$state_dir/last_deploy"
+    
+    print_status "Deployment state saved for potential rollback"
+}
+
+# Function to rollback to previous deployment
+rollback_deployment() {
+    print_status "Rolling back to previous deployment..."
+    local state_dir=".deploy_state"
+    
+    if [ ! -f "$state_dir/last_commit" ]; then
+        print_error "No previous deployment state found for rollback"
+        return 1
+    fi
+    
+    local last_commit=$(cat "$state_dir/last_commit")
+    print_status "Rolling back to commit: $last_commit"
+    
+    # Stop current containers
+    docker compose down
+    
+    # Checkout previous commit
+    git checkout "$last_commit"
+    
+    # Rebuild and deploy
+    print_status "Rebuilding from previous commit..."
+    docker compose up --build -d
+    
+    # Wait for rollback to complete
+    local max_wait=60
+    local wait_time=0
+    
+    while [ $wait_time -lt $max_wait ]; do
+        if docker compose ps | grep -q "bogart-bot.*Up.*healthy"; then
+            print_success "Rollback completed successfully!"
+            return 0
+        elif docker compose ps | grep -q "bogart-bot.*Up"; then
+            print_status "Rollback container starting... (${wait_time}s/${max_wait}s)"
+        else
+            print_error "Rollback failed - container not starting"
+            return 1
+        fi
+        
+        sleep 5
+        wait_time=$((wait_time + 5))
+    done
+    
+    print_warning "Rollback container started but health check timed out"
+    return 1
+}
+
+# Function to validate configuration before deployment
+validate_deployment_config() {
+    print_status "Validating deployment configuration..."
+    
+    # Check required environment variables
+    if [ ! -f ".env" ]; then
+        print_error "Missing .env file"
+        return 1
+    fi
+    
+    # Check if DISCORD_TOKEN is set (without revealing the value)
+    if ! grep -q "^DISCORD_TOKEN=" .env || grep -q "^DISCORD_TOKEN=$" .env; then
+        print_error "DISCORD_TOKEN is not set in .env file"
+        return 1
+    fi
+    
+    # Check docker-compose.yml exists
+    if [ ! -f "docker-compose.yml" ]; then
+        print_error "Missing docker-compose.yml file"
+        return 1
+    fi
+    
+    # Check Dockerfile exists
+    if [ ! -f "Dockerfile" ]; then
+        print_error "Missing Dockerfile"
+        return 1
+    fi
+    
+    # Validate docker-compose syntax
+    if ! docker compose config > /dev/null 2>&1; then
+        print_error "Invalid docker-compose.yml configuration"
+        return 1
+    fi
+    
+    print_success "Deployment configuration validated"
+    return 0
+}
+
 # Function to deploy (single mode) with automatic log viewing
 deploy() {
     print_status "Deploying using docker-compose.yml..."
     check_prerequisites
+    
+    # Validate configuration before deployment
+    if ! validate_deployment_config; then
+        print_error "Configuration validation failed. Deployment aborted."
+        exit 1
+    fi
+    
+    # Save current state for potential rollback
+    save_deployment_state
     
     # Check if containers are currently running
     if docker compose ps | grep -q "Up"; then
@@ -207,7 +354,16 @@ deploy() {
             print_error "Container failed to start"
             print_status "Container status:"
             docker compose ps
-            return 1
+            
+            # Attempt automatic rollback
+            print_warning "Attempting automatic rollback..."
+            if rollback_deployment; then
+                print_success "Automatic rollback completed"
+                return 0
+            else
+                print_error "Automatic rollback failed. Manual intervention required."
+                return 1
+            fi
         fi
         
         sleep 5
@@ -217,6 +373,10 @@ deploy() {
     if [ $wait_time -ge $max_wait ]; then
         print_warning "Container started but health check timed out after ${max_wait}s"
         print_status "This may be normal on first startup. Check logs for issues."
+        
+        # Give user option to rollback
+        print_status "Would you like to rollback? (Ctrl+C to cancel, Enter to continue with current deployment)"
+        read -r
     fi
     
     print_status "Final container status:"
@@ -343,6 +503,27 @@ backup_config() {
     print_success "Backup created: $backup_dir/$backup_file"
 }
 
+# Function to show deployment history
+show_deployment_history() {
+    print_status "Deployment History:"
+    local state_dir=".deploy_state"
+    
+    if [ -f "$state_dir/last_deploy" ] && [ -f "$state_dir/last_commit" ]; then
+        local last_deploy=$(cat "$state_dir/last_deploy")
+        local last_commit=$(cat "$state_dir/last_commit")
+        echo "  Last deployment: $last_deploy"
+        echo "  Last commit: $last_commit"
+        
+        # Show commit details
+        if git show --oneline -s "$last_commit" 2>/dev/null; then
+            echo "  Commit details: $(git show --oneline -s "$last_commit" 2>/dev/null)"
+        fi
+    else
+        echo "  No deployment history found"
+    fi
+    echo ""
+}
+
 # Function to show help
 show_help() {
     echo "Bogart Discord Bot Deployment Script"
@@ -351,25 +532,34 @@ show_help() {
     echo ""
     echo "Commands:"
     echo "  deploy             Deploy using docker-compose.yml (shows logs automatically)"
-    echo "  merge              Safely merge develop → main"
+    echo "  merge              Safely merge develop → main (with pre-merge testing)"
     echo "  merge-deploy       Merge develop → main and deploy in one command"
+    echo "  rollback           Rollback to previous deployment"
     echo "  stop               Stop all services"
     echo "  logs               Show logs"
     echo "  status             Show service status"
+    echo "  history            Show deployment history"
     echo "  update             Update deployment"
     echo "  cleanup            Clean up unused Docker resources"
     echo "  backup             Backup configuration files"
     echo "  help               Show this help message"
     echo ""
     echo "Git Workflow Commands:"
-    echo "  merge              - Safely merge develop into main with validation"
-    echo "  merge-deploy       - Complete workflow: merge + deploy + show logs"
+    echo "  merge              - Safely merge develop into main with pre-merge testing"
+    echo "  merge-deploy       - Complete workflow: test + merge + deploy + show logs"
+    echo ""
+    echo "Safety Features:"
+    echo "  • Pre-merge testing (npm test + build validation)"
+    echo "  • Automatic rollback on deployment failure"
+    echo "  • Configuration validation before deployment"
+    echo "  • Deployment state tracking for rollback capability"
     echo ""
     echo "Examples:"
-    echo "  $0 merge-deploy    # Merge develop→main, deploy, and show logs"
-    echo "  $0 deploy          # Deploy and show logs"
-    echo "  $0 merge           # Just merge develop→main safely"
-    echo "  $0 logs            # Show container logs"
+    echo "  $0 merge-deploy    # Full workflow with testing, merge, deploy, and logs"
+    echo "  $0 deploy          # Deploy current branch and show logs"
+    echo "  $0 merge           # Safely merge develop→main with testing"
+    echo "  $0 rollback        # Rollback to previous deployment"
+    echo "  $0 history         # Show deployment history"
     echo ""
 }
 
@@ -384,6 +574,9 @@ case "${1:-help}" in
     "merge-deploy")
         merge_deploy
         ;;
+    "rollback")
+        rollback_deployment
+        ;;
     "stop")
         stop_services
         ;;
@@ -392,6 +585,9 @@ case "${1:-help}" in
         ;;
     "status")
         show_status
+        ;;
+    "history")
+        show_deployment_history
         ;;
     "update")
         update_deployment

@@ -128,8 +128,8 @@ export class WanderingService {
     const jitteredInterval = this.getJitteredDelay(DECISION_CYCLE_BASE_INTERVAL, DECISION_CYCLE_JITTER_PERCENT);
     console.log(`Next decision cycle in ${Math.round(jitteredInterval / 1000 / 60 * 10) / 10} minutes`);
     
-    this.decisionCycleInterval = setInterval(() => {
-      this.runDecisionCycle();
+    this.decisionCycleInterval = setInterval(async () => {
+      await this.runDecisionCycle();
       // Reschedule with new jitter
       if (this.decisionCycleInterval) {
         clearInterval(this.decisionCycleInterval);
@@ -457,17 +457,16 @@ export class WanderingService {
       const botWasLastAuthor = lastMessage.author.id === botId;
       const botInRecentMessages = recentMessages.some(m => m.author.id === botId);
 
+      let botPresencePenalty = 0;
       if (botWasLastAuthor) {
-        diversityScore *= 0.1; // 90% penalty
-        recencyScore *= 0.1;
+        botPresencePenalty = 50; // Heavy penalty if bot was the last one to speak
       } else if (botInRecentMessages) {
-        diversityScore *= 0.5; // 50% penalty
-        recencyScore *= 0.5;
+        botPresencePenalty = 20; // Lesser penalty if bot is just in recent history
       }
 
-      // Calculate base score first, then apply human activity modifier to final result
+      // Calculate base score first, then apply human activity modifier and penalty
       const baseScore = diversityScore + recencyScore;
-      const totalScore = baseScore * humanActivityModifier;
+      const totalScore = (baseScore * humanActivityModifier) - botPresencePenalty;
       
       let activityLevel: 'high' | 'medium' | 'low' | 'inactive';
       // Activity level now considers human participants and bot percentage

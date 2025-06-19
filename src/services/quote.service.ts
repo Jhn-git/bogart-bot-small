@@ -12,27 +12,38 @@ export class QuoteService {
     channelName: string,
     placeholders?: Record<string, string>,
   ): string {
+    console.log(`Getting wandering message for channel: ${channelName}`);
+    console.log('Available quotes:', this.quotes);
+    
+    // First check channel-specific messages
+    const channelSpecific = this.quotes.channel_specific_wandering_messages;
+    if (channelSpecific && channelSpecific[channelName]?.length > 0) {
+      console.log(`Found channel-specific message for ${channelName}`);
+      return this.getRandomMessage(channelSpecific[channelName], placeholders);
+    }
+
+    // Then check goblin messages
     const goblinMessages = this.quotes.goblin_wandering_messages;
+    if (goblinMessages && goblinMessages[channelName]?.length > 0) {
+      console.log(`Found goblin message for ${channelName}`);
+      return this.getRandomMessage(goblinMessages[channelName], placeholders);
+    }
+
+    // Finally use generic messages
     const genericMessages = this.quotes.generic_wandering_messages;
-
-    let messages: string[] | undefined;
-
-    if (
-      goblinMessages &&
-      typeof goblinMessages === 'object' &&
-      channelName in goblinMessages
-    ) {
-      messages = goblinMessages[channelName];
+    if (genericMessages?.length > 0) {
+      console.log('Using generic message');
+      return this.getRandomMessage(genericMessages, placeholders);
     }
 
-    if (!messages || messages.length === 0) {
-      messages = genericMessages;
-    }
+    console.warn('No messages available for any channel type');
+    return '...';
+  }
 
-    if (!messages || messages.length === 0) {
-      return '...';
-    }
-
+  private getRandomMessage(
+    messages: string[],
+    placeholders?: Record<string, string>
+  ): string {
     const randomIndex = Math.floor(Math.random() * messages.length);
     let message = messages[randomIndex];
 

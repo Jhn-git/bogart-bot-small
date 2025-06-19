@@ -6,7 +6,7 @@ import { QuoteService } from '../quote.service';
 import { GuildService } from '../guild.service';
 import { ChannelDiscoveryService } from '../channel-discovery.service';
 import { ConfigService } from '../config.service';
-import { Guild, TextChannel, Collection } from 'discord.js';
+import { Guild, TextChannel, Collection, Message, User, PermissionsBitField } from 'discord.js';
 import { Client } from 'discord.js';
 
 jest.useFakeTimers();
@@ -30,11 +30,12 @@ describe('WanderingService', () => {
 
     mockClient = {
       isReady: jest.fn().mockReturnValue(true),
+      user: { id: 'bot-id' }
     } as unknown as jest.Mocked<Client>;
 
     mockDiscordService = new DiscordService({} as any) as jest.Mocked<DiscordService>;
     mockDiscordService.getClient = jest.fn().mockReturnValue(mockClient);
-    mockDiscordService.sendMessage = jest.fn().mockResolvedValue(undefined);
+    mockDiscordService.sendMessage = jest.fn().mockResolvedValue(true);
 
     mockQuoteService = new QuoteService({} as any) as jest.Mocked<QuoteService>;
     mockQuoteService.getWanderingMessage = jest.fn().mockReturnValue('A wandering message.');
@@ -55,19 +56,56 @@ describe('WanderingService', () => {
     wanderingService.stop();
   });
 
+  // Helper function to create mock messages with human/bot authors
+  const createMockMessage = (authorId: string, isBot: boolean, timestamp?: number): any => ({
+    author: { id: authorId, bot: isBot } as User,
+    createdTimestamp: timestamp || Date.now() - (60 * 1000) // 1 minute ago by default
+  });
+
+  // Helper function to create mock channel with message history
+  const createMockChannel = (id: string, name: string, messages: any[] = []): any => {
+    const mockMessages = new Collection<string, any>();
+    messages.forEach((msg, index) => {
+      mockMessages.set(`msg-${index}`, msg);
+    });
+
+    return {
+      id,
+      name,
+      client: mockClient,
+      guild: { members: { me: { id: 'bot-id' } } } as any,
+      permissionsFor: jest.fn().mockReturnValue({
+        has: jest.fn().mockReturnValue(true)
+      }),
+      messages: {
+        fetch: jest.fn().mockResolvedValue(mockMessages)
+      }
+    };
+  };
+
   describe('sendWanderingMessages', () => {
     it('should send a message to only ONE eligible channel per guild', async () => {
       // Arrange
       const guild1 = { id: '1', name: 'Guild 1' } as Guild;
       const guild2 = { id: '2', name: 'Guild 2' } as Guild;
+      
+      // Create channels with human activity to ensure they score well
+      const humanMessages = [
+        createMockMessage('user1', false),
+        createMockMessage('user2', false),
+        createMockMessage('user3', false),
+        createMockMessage('user4', false),
+        createMockMessage('user5', false)
+      ];
+      
       const channels1 = [
-        { id: 'c1', name: 'general' },
-        { id: 'c2', name: 'chat' },
-      ] as TextChannel[];
+        createMockChannel('c1', 'general', humanMessages),
+        createMockChannel('c2', 'chat', humanMessages),
+      ];
       const channels2 = [
-        { id: 'c3', name: 'bot-stuff' },
-        { id: 'c4', name: 'random' },
-      ] as TextChannel[];
+        createMockChannel('c3', 'bot-stuff', humanMessages),
+        createMockChannel('c4', 'random', humanMessages),
+      ];
 
       mockGuildService.getAllGuilds.mockReturnValue([guild1, guild2]);
       mockChannelDiscoveryService.discoverEligibleChannels
@@ -108,7 +146,12 @@ describe('WanderingService', () => {
 
     it('should handle errors when sending messages', async () => {
       const guild1 = { id: '1', name: 'Guild 1' } as Guild;
-      const channels1 = [{ id: 'c1', name: 'general' }] as TextChannel[];
+      const humanMessages = [
+        createMockMessage('user1', false),
+        createMockMessage('user2', false),
+        createMockMessage('user3', false),
+      ];
+      const channels1 = [createMockChannel('c1', 'general', humanMessages)];
       mockGuildService.getAllGuilds.mockReturnValue([guild1]);
       mockChannelDiscoveryService.discoverEligibleChannels.mockReturnValue(channels1);
       mockDiscordService.sendMessage.mockResolvedValue(false);
@@ -135,8 +178,13 @@ describe('WanderingService', () => {
     it('should respect per-guild rate limiting', async () => {
       const guild1 = { id: '1', name: 'Guild 1' } as Guild;
       const guild2 = { id: '2', name: 'Guild 2' } as Guild;
-      const channels1 = [{ id: 'c1', name: 'general' }] as TextChannel[];
-      const channels2 = [{ id: 'c2', name: 'general' }] as TextChannel[];
+      const humanMessages = [
+        createMockMessage('user1', false),
+        createMockMessage('user2', false),
+        createMockMessage('user3', false),
+      ];
+      const channels1 = [createMockChannel('c1', 'general', humanMessages)];
+      const channels2 = [createMockChannel('c2', 'general', humanMessages)];
 
       mockGuildService.getAllGuilds.mockReturnValue([guild1, guild2]);
       mockChannelDiscoveryService.discoverEligibleChannels
@@ -170,6 +218,78 @@ describe('WanderingService', () => {
       expect(mockDiscordService.sendMessage).toHaveBeenCalledTimes(2);
       expect(mockDiscordService.sendMessage).toHaveBeenCalledWith(channels1[0].id, expect.any(String));
       expect(mockDiscordService.sendMessage).toHaveBeenCalledWith(channels2[0].id, expect.any(String));
+    });
+
+    it('should avoid channels dominated by bot messages', async () => {
+      const guild1 = { id: '1', name: 'Guild 1' } as Guild;
+      
+      // Create bot-dominated channel (80% bot messages)
+      const botDominatedMessages = [
+        createMockMessage('bot1', true),
+        createMockMessage('bot2', true),
+        createMockMessage('bot3', true),
+        createMockMessage('bot4', true),
+        createMockMessage('user1', false) // Only 20% human
+      ];
+      
+      // Create human-friendly channel (80% human messages)
+      const humanFriendlyMessages = [
+        createMockMessage('user1', false),
+        createMockMessage('user2', false),
+        createMockMessage('user3', false),
+        createMockMessage('user4', false),
+        createMockMessage('bot1', true) // Only 20% bot
+      ];
+      
+      const channels = [
+        createMockChannel('c1', 'bot-logs', botDominatedMessages),
+        createMockChannel('c2', 'general', humanFriendlyMessages),
+      ];
+
+      mockGuildService.getAllGuilds.mockReturnValue([guild1]);
+      mockChannelDiscoveryService.discoverEligibleChannels.mockReturnValue(channels);
+
+      wanderingService.start();
+      await jest.advanceTimersByTimeAsync(12 * 60 * 60 * 1000);
+
+      // Should send to human-friendly channel, not bot-dominated
+      expect(mockDiscordService.sendMessage).toHaveBeenCalledTimes(1);
+      expect(mockDiscordService.sendMessage).toHaveBeenCalledWith('c2', expect.any(String));
+    });
+
+    it('should handle zero-human channels correctly', async () => {
+      const guild1 = { id: '1', name: 'Guild 1' } as Guild;
+      
+      // Create zero-human channel (100% bot messages)
+      const zeroHumanMessages = [
+        createMockMessage('bot1', true),
+        createMockMessage('bot2', true),
+        createMockMessage('bot3', true),
+        createMockMessage('bot4', true),
+        createMockMessage('bot5', true)
+      ];
+      
+      // Create human channel for comparison
+      const humanMessages = [
+        createMockMessage('user1', false),
+        createMockMessage('user2', false),
+        createMockMessage('user3', false)
+      ];
+      
+      const channels = [
+        createMockChannel('c1', 'bot-logs', zeroHumanMessages),
+        createMockChannel('c2', 'general', humanMessages),
+      ];
+
+      mockGuildService.getAllGuilds.mockReturnValue([guild1]);
+      mockChannelDiscoveryService.discoverEligibleChannels.mockReturnValue(channels);
+
+      wanderingService.start();
+      await jest.advanceTimersByTimeAsync(12 * 60 * 60 * 1000);
+
+      // Zero-human channel should be avoided due to extremely low score
+      expect(mockDiscordService.sendMessage).toHaveBeenCalledTimes(1);
+      expect(mockDiscordService.sendMessage).toHaveBeenCalledWith('c2', expect.any(String));
     });
   });
 });

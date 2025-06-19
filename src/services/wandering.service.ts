@@ -58,7 +58,7 @@ const TIMESTAMP_CLEANUP_INTERVAL = 24 * 60 * 60 * 1000; // 24 hours - cleanup ol
 const TIMESTAMP_MAX_AGE = 7 * 24 * 60 * 60 * 1000; // 7 days - max age for stored timestamps
 
 // Persistence Constants
-const COOLDOWNS_FILE = 'cooldowns.json';
+const COOLDOWNS_FILE = '/app/data/cooldowns.json';
 
 export class WanderingService {
   private discordService: DiscordService;

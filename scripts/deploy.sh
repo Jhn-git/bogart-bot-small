@@ -163,9 +163,6 @@ show_deployment_logs() {
     print_status "🚀 Deployment complete! Following logs (Press Ctrl+C to stop)..."
     echo ""
     
-    # Wait a moment for containers to fully start
-    sleep 2
-    
     if ! docker compose ps | grep -q "bogart-bot.*Up"; then
         print_warning "Container not running yet. Check status with: $0 status"
         return 1
@@ -182,11 +179,55 @@ show_deployment_logs() {
 deploy() {
     print_status "Deploying using docker-compose.yml..."
     check_prerequisites
+    
+    # Check if containers are currently running
+    if docker compose ps | grep -q "Up"; then
+        print_status "Stopping existing containers..."
+        docker compose down
+        print_success "Existing containers stopped"
+    else
+        print_status "No existing containers found"
+    fi
+    
     print_status "Building and starting environment..."
     docker compose up --build -d
-    print_success "Deployment completed!"
-    print_status "Container status:"
+    
+    # Wait for containers to start and become healthy
+    print_status "Waiting for containers to start and become healthy..."
+    local max_wait=60
+    local wait_time=0
+    
+    while [ $wait_time -lt $max_wait ]; do
+        if docker compose ps | grep -q "bogart-bot.*Up.*healthy"; then
+            print_success "Container is running and healthy!"
+            break
+        elif docker compose ps | grep -q "bogart-bot.*Up"; then
+            print_status "Container starting... (${wait_time}s/${max_wait}s)"
+        else
+            print_error "Container failed to start"
+            print_status "Container status:"
+            docker compose ps
+            return 1
+        fi
+        
+        sleep 5
+        wait_time=$((wait_time + 5))
+    done
+    
+    if [ $wait_time -ge $max_wait ]; then
+        print_warning "Container started but health check timed out after ${max_wait}s"
+        print_status "This may be normal on first startup. Check logs for issues."
+    fi
+    
+    print_status "Final container status:"
     docker compose ps
+    echo ""
+    
+    print_success "✅ Deployment Summary:"
+    print_status "• Stopped existing containers (if any)"
+    print_status "• Built fresh container images"
+    print_status "• Started containers with health checks"
+    print_status "• Verified container is running and healthy"
     echo ""
     
     # Automatically show logs after deployment
@@ -230,9 +271,47 @@ show_status() {
 # Function to update deployment
 update_deployment() {
     print_status "Updating deployment..."
+    
+    # Stop existing containers
+    if docker compose ps | grep -q "Up"; then
+        print_status "Stopping existing containers..."
+        docker compose down
+    fi
+    
+    # Pull latest images and rebuild
+    print_status "Pulling latest images..."
     docker compose pull
+    
+    print_status "Building and starting updated environment..."
     docker compose up --build -d
-    print_success "Update completed!"
+    
+    # Wait for containers to start and become healthy
+    print_status "Waiting for containers to start and become healthy..."
+    local max_wait=60
+    local wait_time=0
+    
+    while [ $wait_time -lt $max_wait ]; do
+        if docker compose ps | grep -q "bogart-bot.*Up.*healthy"; then
+            print_success "Update completed successfully!"
+            break
+        elif docker compose ps | grep -q "bogart-bot.*Up"; then
+            print_status "Container starting... (${wait_time}s/${max_wait}s)"
+        else
+            print_error "Update failed - container not running"
+            docker compose ps
+            return 1
+        fi
+        
+        sleep 5
+        wait_time=$((wait_time + 5))
+    done
+    
+    if [ $wait_time -ge $max_wait ]; then
+        print_warning "Container started but health check timed out after ${max_wait}s"
+    fi
+    
+    print_status "Container status:"
+    docker compose ps
 }
 
 # Function to clean up Docker resources

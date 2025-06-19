@@ -13,9 +13,12 @@ async function gracefulShutdown(signal: string) {
   console.log(`${signal} received, starting graceful shutdown...`);
 
   try {
-    // Stop the wandering service first
+    // Stop services
     console.log('Stopping wandering service...');
     container.wanderingService.stop();
+    
+    console.log('Stopping status service...');
+    container.statusService.stop();
 
     // Destroy the Discord client
     console.log('Disconnecting from Discord...');

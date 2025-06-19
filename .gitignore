@@ -105,3 +105,4 @@ docker-compose.override.yml
 # Deployment backups
 backups/
 cooldowns.json
+.deploy_state/

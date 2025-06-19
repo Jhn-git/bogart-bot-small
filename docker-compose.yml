@@ -22,7 +22,7 @@ x-base-service: &base-service
 services:
   bogart-bot:
     <<: *base-service
-    container_name: bogart-bot-prod
+    container_name: bogart-bot-small-prod
     build:
       context: .
       dockerfile: Dockerfile

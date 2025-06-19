@@ -5,7 +5,7 @@ import { MessageCleanupOptions, MessageCleanupResult } from '../src/types';
 
 async function main() {
   const cleanupMode = process.env.CLEANUP_MODE === 'true';
-  const dryRun = process.argv.includes('--dry-run') || !cleanupMode;
+  const dryRun = process.argv.includes('--dry-run') && !process.argv.includes('--confirm');
   const confirm = process.argv.includes('--confirm') || cleanupMode;
   const hoursArg = process.argv.find((arg) => arg.startsWith('--hours='));
   const hours = hoursArg ? parseInt(hoursArg.split('=')[1], 10) : 48;

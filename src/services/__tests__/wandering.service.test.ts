@@ -8,6 +8,7 @@ import { ChannelDiscoveryService } from '../channel-discovery.service';
 import { ConfigService } from '../config.service';
 import { Guild, TextChannel, Collection, Message, User, PermissionsBitField } from 'discord.js';
 import { Client } from 'discord.js';
+import * as fs from 'fs';
 
 jest.useFakeTimers();
 
@@ -16,6 +17,7 @@ jest.mock('../discord.service');
 jest.mock('../quote.service');
 jest.mock('../guild.service');
 jest.mock('../channel-discovery.service');
+jest.mock('fs');
 
 describe('WanderingService', () => {
   let wanderingService: WanderingService;
@@ -24,9 +26,17 @@ describe('WanderingService', () => {
   let mockGuildService: jest.Mocked<GuildService>;
   let mockChannelDiscoveryService: jest.Mocked<ChannelDiscoveryService>;
   let mockClient: jest.Mocked<Client>;
+  let mockFs: jest.Mocked<typeof fs>;
 
   beforeEach(() => {
     jest.clearAllMocks();
+
+    // Mock fs methods using require.requireMock
+    const mockFs = require('fs');
+    mockFs.existsSync = jest.fn().mockReturnValue(false);
+    mockFs.readFileSync = jest.fn();
+    mockFs.writeFileSync = jest.fn();
+    mockFs.renameSync = jest.fn();
 
     mockClient = {
       isReady: jest.fn().mockReturnValue(true),
@@ -53,7 +63,9 @@ describe('WanderingService', () => {
   });
 
   afterEach(() => {
-    wanderingService.stop();
+    if (wanderingService) {
+      wanderingService.stop();
+    }
   });
 
   // Helper function to create mock messages with human/bot authors
@@ -290,6 +302,109 @@ describe('WanderingService', () => {
       // Zero-human channel should be avoided due to extremely low score
       expect(mockDiscordService.sendMessage).toHaveBeenCalledTimes(1);
       expect(mockDiscordService.sendMessage).toHaveBeenCalledWith('c2', expect.any(String));
+    });
+
+    describe('cooldown persistence', () => {
+      it('should load existing cooldowns on startup', () => {
+        // Mock existing cooldowns file
+        const mockCooldowns = {
+          'guild1': Date.now() + (6 * 60 * 60 * 1000), // 6 hours from now
+          'guild2': Date.now() - (1 * 60 * 60 * 1000), // 1 hour ago (expired)
+        };
+        
+        const mockFs = require('fs');
+        mockFs.existsSync.mockReturnValue(true);
+        mockFs.readFileSync.mockReturnValue(JSON.stringify(mockCooldowns));
+
+        // Create new service instance to trigger loading
+        const newService = new WanderingService(
+          mockDiscordService,
+          mockQuoteService,
+          mockGuildService,
+          mockChannelDiscoveryService
+        );
+
+        expect(mockFs.existsSync).toHaveBeenCalledWith('cooldowns.json');
+        expect(mockFs.readFileSync).toHaveBeenCalledWith('cooldowns.json', 'utf8');
+        
+        // Clean up the new service
+        newService.stop();
+      });
+
+      it('should save cooldowns after sending a message', async () => {
+        const guild1 = { id: '1', name: 'Guild 1' } as Guild;
+        const humanMessages = [
+          createMockMessage('user1', false),
+          createMockMessage('user2', false),
+          createMockMessage('user3', false),
+        ];
+        const channels1 = [createMockChannel('c1', 'general', humanMessages)];
+        
+        mockGuildService.getAllGuilds.mockReturnValue([guild1]);
+        mockChannelDiscoveryService.discoverEligibleChannels.mockReturnValue(channels1);
+
+        wanderingService.start();
+        await jest.advanceTimersByTimeAsync(12 * 60 * 60 * 1000);
+
+        // Should save cooldowns after sending message
+        const mockFs = require('fs');
+        expect(mockFs.writeFileSync).toHaveBeenCalled();
+        expect(mockFs.renameSync).toHaveBeenCalledWith('cooldowns.json.tmp', 'cooldowns.json');
+      });
+
+      it('should save cooldowns on service stop', () => {
+        wanderingService.stop();
+        
+        const mockFs = require('fs');
+        expect(mockFs.writeFileSync).toHaveBeenCalled();
+        expect(mockFs.renameSync).toHaveBeenCalledWith('cooldowns.json.tmp', 'cooldowns.json');
+      });
+
+      it('should handle corrupted cooldowns file gracefully', () => {
+        // Mock corrupted file
+        const mockFs = require('fs');
+        mockFs.existsSync.mockReturnValue(true);
+        mockFs.readFileSync.mockReturnValue('invalid json');
+
+        // Should not throw error during construction
+        expect(() => {
+          const newService = new WanderingService(
+            mockDiscordService,
+            mockQuoteService,
+            mockGuildService,
+            mockChannelDiscoveryService
+          );
+          newService.stop();
+        }).not.toThrow();
+      });
+
+      it('should handle file write errors gracefully', async () => {
+        const guild1 = { id: '1', name: 'Guild 1' } as Guild;
+        const humanMessages = [
+          createMockMessage('user1', false),
+          createMockMessage('user2', false),
+        ];
+        const channels1 = [createMockChannel('c1', 'general', humanMessages)];
+        
+        mockGuildService.getAllGuilds.mockReturnValue([guild1]);
+        mockChannelDiscoveryService.discoverEligibleChannels.mockReturnValue(channels1);
+        
+        const mockFs = require('fs');
+        mockFs.writeFileSync.mockImplementation(() => { throw new Error('Disk full'); });
+
+        const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+
+        wanderingService.start();
+        await jest.advanceTimersByTimeAsync(12 * 60 * 60 * 1000);
+
+        // Should log error but continue functioning
+        expect(consoleErrorSpy).toHaveBeenCalledWith(
+          'WanderingService: Error saving cooldowns to persistent storage:', 
+          expect.any(Error)
+        );
+        
+        consoleErrorSpy.mockRestore();
+      });
     });
   });
 });

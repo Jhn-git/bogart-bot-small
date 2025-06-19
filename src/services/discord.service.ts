@@ -7,6 +7,7 @@ export class DiscordService {
   private lastMessageTime: number = 0;
   private messagesSent: number = 0;
   private messageSendingDisabled: boolean = false;
+  private statusService: any = null; // Will be set via dependency injection
 
   constructor(configService: ConfigService) {
     this.configService = configService;
@@ -16,6 +17,32 @@ export class DiscordService {
 
     this.client.on('ready', () => {
       console.log(`Logged in as ${this.client.user?.tag}!`);
+      console.log(`Connected to ${this.client.guilds.cache.size} servers`);
+      
+      // Start status service when client is ready
+      if (this.statusService && typeof this.statusService.start === 'function') {
+        this.statusService.start();
+      }
+    });
+
+    this.client.on('guildCreate', (guild) => {
+      console.log(`Joined new server: ${guild.name} (${guild.id})`);
+      console.log(`Now active in ${this.client.guilds.cache.size} servers`);
+      
+      // Notify status service of guild count change
+      if (this.statusService && typeof this.statusService.onGuildCountChange === 'function') {
+        this.statusService.onGuildCountChange();
+      }
+    });
+
+    this.client.on('guildDelete', (guild) => {
+      console.log(`Left server: ${guild.name} (${guild.id})`);
+      console.log(`Now active in ${this.client.guilds.cache.size} servers`);
+      
+      // Notify status service of guild count change
+      if (this.statusService && typeof this.statusService.onGuildCountChange === 'function') {
+        this.statusService.onGuildCountChange();
+      }
     });
 
     this.client.on('error', (error) => {
@@ -88,5 +115,9 @@ export class DiscordService {
 
   public getClient(): Client {
     return this.client;
+  }
+
+  public setStatusService(statusService: any): void {
+    this.statusService = statusService;
   }
 }

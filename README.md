@@ -12,6 +12,7 @@ Bogart now operates safely across all guilds it is invited to by default. The `A
 -   **Intelligent Channel Discovery**: Automatically finds suitable channels to post in, requiring no manual configuration.
 -   **Improved Security**: Includes permission validation, rate limiting, and NSFW channel filtering.
 -   **Wandering Messages**: Sends periodic messages to channels every 12 hours.
+-   **Loneliness Prevention**: Ensures small or inactive servers are never forgotten with a "Long Time No See" bonus system.
 -   **Extensible Quote System**: Easily customizable messages via a YAML configuration file.
 -   **Dockerized**: Comes with a fully configured, production-ready Docker setup.
 -   **Comprehensive Test Suite**: Full test coverage with Jest.
@@ -173,6 +174,32 @@ npm run test:coverage
 ### Quotes
 
 All bot messages are defined in `data/quotes.yaml`. You can add or modify messages without needing to rebuild the Docker image.
+
+## Loneliness Prevention System
+
+Bogart includes an innovative "Long Time No See" bonus system that ensures no server is ever truly forgotten, regardless of how small or inactive it may be.
+
+### How It Works
+
+The system balances activity-based scoring with a loneliness bonus:
+
+1. **Active servers** are prioritized through the standard scoring system based on human participants, recent activity, and conversation diversity.
+
+2. **Quiet servers** receive a loneliness bonus that grows over time:
+   - **+5 points per day** since the bot's last visit
+   - After 10 days without a visit, a server gets +50 bonus points
+   - This bonus can push even inactive channels above the minimum score threshold (50 points)
+
+3. **Self-regulating**: Once a server is visited, its loneliness bonus resets to zero, putting it back in the normal rotation.
+
+### Benefits
+
+- **No Server Left Behind**: Even the quietest servers will eventually receive a visit
+- **Maintains Activity Focus**: Busy servers still get more frequent attention
+- **Gradual Intervention**: The bonus grows slowly, giving active servers priority while ensuring quiet ones aren't permanently forgotten
+- **Transparent**: The loneliness bonus is visible in the bot's decision-making logs
+
+This system perfectly balances the mathematical "best choice" logic with an empathetic "be a friend to the lonely" approach.
 
 ## Architecture
 

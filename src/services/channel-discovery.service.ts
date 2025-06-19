@@ -50,7 +50,7 @@ export class ChannelDiscoveryService {
           !permissions?.has(PermissionsBitField.Flags.SendMessages) ||
           !permissions?.has(PermissionsBitField.Flags.ReadMessageHistory)) {
         // Only log permission issues in development/production, not during tests
-        if (process.env.NODE_ENV !== 'test') {
+        if (process.env.NODE_ENV !== 'test' && process.env.LOG_LEVEL === 'debug') {
           console.log(`⚠️  Channel ${channel.name} in ${channel.guild.name}: Missing permissions (ViewChannel: ${permissions?.has(PermissionsBitField.Flags.ViewChannel)}, SendMessages: ${permissions?.has(PermissionsBitField.Flags.SendMessages)}, ReadMessageHistory: ${permissions?.has(PermissionsBitField.Flags.ReadMessageHistory)})`);
         }
         return false;

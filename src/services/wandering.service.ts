@@ -373,7 +373,7 @@ export class WanderingService {
       // Pre-emptive permission check before attempting to fetch messages
       const permissions = channel.permissionsFor(channel.guild.members.me!);
       if (!permissions?.has(PermissionsBitField.Flags.ViewChannel) || !permissions?.has(PermissionsBitField.Flags.ReadMessageHistory)) {
-        if (process.env.NODE_ENV !== 'test') {
+        if (process.env.NODE_ENV !== 'test' && process.env.LOG_LEVEL === 'debug') {
           console.log(`⚠️  Skipping ${channel.name} in ${guild.name}: Missing permissions (ViewChannel: ${permissions?.has(PermissionsBitField.Flags.ViewChannel)}, ReadMessageHistory: ${permissions?.has(PermissionsBitField.Flags.ReadMessageHistory)})`);
         }
         return null;
@@ -389,9 +389,13 @@ export class WanderingService {
           if (fetchError instanceof Error && 'code' in fetchError) {
             const discordError = fetchError as Error & { code: number };
             if (discordError.code === 50001) {
-              console.log(`⚠️  Missing Access to fetch messages in ${channel.name} (${guild.name}): Permission check passed but API call failed`);
+              if (process.env.LOG_LEVEL === 'debug') {
+                console.log(`⚠️  Missing Access to fetch messages in ${channel.name} (${guild.name}): Permission check passed but API call failed`);
+              }
             } else if (discordError.code === 50013) {
-              console.log(`⚠️  Missing Permissions to fetch messages in ${channel.name} (${guild.name})`);
+              if (process.env.LOG_LEVEL === 'debug') {
+                console.log(`⚠️  Missing Permissions to fetch messages in ${channel.name} (${guild.name})`);
+              }
             } else {
               console.warn(`⚠️  Error fetching messages in ${channel.name} (${guild.name}):`, discordError.message);
             }

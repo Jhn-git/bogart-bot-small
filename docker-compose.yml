@@ -44,6 +44,9 @@ services:
         reservations:
           cpus: '0.2'
           memory: 256M
+    dns:
+      - 8.8.8.8
+      - 8.8.4.4
     healthcheck:
       test: ["CMD", "node", "-e", "console.log('Bot health check - OK')"]
       interval: 30s

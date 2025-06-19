@@ -44,10 +44,15 @@ export class ChannelDiscoveryService {
    */
   private isChannelEligible(channel: TextChannel): boolean {
     try {
-      // Permission: Bot must be able to send messages and read message history
+      // Permission: Bot must be able to view channel, send messages and read message history
       const permissions = channel.permissionsFor(channel.guild.members.me!);
-      if (!permissions?.has(PermissionsBitField.Flags.SendMessages) ||
+      if (!permissions?.has(PermissionsBitField.Flags.ViewChannel) ||
+          !permissions?.has(PermissionsBitField.Flags.SendMessages) ||
           !permissions?.has(PermissionsBitField.Flags.ReadMessageHistory)) {
+        // Only log permission issues in development/production, not during tests
+        if (process.env.NODE_ENV !== 'test') {
+          console.log(`⚠️  Channel ${channel.name} in ${channel.guild.name}: Missing permissions (ViewChannel: ${permissions?.has(PermissionsBitField.Flags.ViewChannel)}, SendMessages: ${permissions?.has(PermissionsBitField.Flags.SendMessages)}, ReadMessageHistory: ${permissions?.has(PermissionsBitField.Flags.ReadMessageHistory)})`);
+        }
         return false;
       }
 

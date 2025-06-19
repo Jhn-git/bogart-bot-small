@@ -1,4 +1,4 @@
-import { TextChannel, Message } from 'discord.js';
+import { TextChannel, Message, PermissionsBitField } from 'discord.js';
 import { DiscordService } from './discord.service';
 import { QuoteService } from './quote.service';
 import { GuildService } from './guild.service';
@@ -354,8 +354,33 @@ export class WanderingService {
 
   private async scoreChannel(channel: TextChannel, guild: any): Promise<ChannelScore | null> {
     try {
+      // Pre-emptive permission check before attempting to fetch messages
+      const permissions = channel.permissionsFor(channel.guild.members.me!);
+      if (!permissions?.has(PermissionsBitField.Flags.ViewChannel) || !permissions?.has(PermissionsBitField.Flags.ReadMessageHistory)) {
+        if (process.env.NODE_ENV !== 'test') {
+          console.log(`⚠️  Skipping ${channel.name} in ${guild.name}: Missing permissions (ViewChannel: ${permissions?.has(PermissionsBitField.Flags.ViewChannel)}, ReadMessageHistory: ${permissions?.has(PermissionsBitField.Flags.ReadMessageHistory)})`);
+        }
+        return null;
+      }
+
       // Fetch recent messages for analysis
-      const messages = await channel.messages.fetch({ limit: MESSAGE_HISTORY_COUNT });
+      let messages;
+      try {
+        messages = await channel.messages.fetch({ limit: MESSAGE_HISTORY_COUNT });
+      } catch (fetchError: any) {
+        // Handle specific Discord API errors more gracefully
+        if (process.env.NODE_ENV !== 'test') {
+          if (fetchError.code === 50001) {
+            console.log(`⚠️  Missing Access to fetch messages in ${channel.name} (${guild.name}): Permission check passed but API call failed`);
+          } else if (fetchError.code === 50013) {
+            console.log(`⚠️  Missing Permissions to fetch messages in ${channel.name} (${guild.name})`);
+          } else {
+            console.warn(`⚠️  Error fetching messages in ${channel.name} (${guild.name}):`, fetchError.message);
+          }
+        }
+        return null;
+      }
+      
       const messageArray = Array.from(messages.values()).reverse(); // Oldest first
       
       if (messageArray.length === 0) {

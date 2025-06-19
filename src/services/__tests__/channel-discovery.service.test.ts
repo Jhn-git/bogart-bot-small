@@ -27,6 +27,7 @@ describe('ChannelDiscoveryService', () => {
     };
     const permissions = new PermissionsBitField();
     if (canSend) {
+      permissions.add(PermissionsBitField.Flags.ViewChannel);
       permissions.add(PermissionsBitField.Flags.SendMessages);
       permissions.add(PermissionsBitField.Flags.ReadMessageHistory);
     }

@@ -3,7 +3,9 @@ import fs from 'fs';
 import { dump } from 'js-yaml';
 
 // Mock dotenv to prevent it from loading .env files during tests
-jest.mock('dotenv');
+jest.mock('dotenv', () => ({
+  config: jest.fn()
+}));
 
 // Since we are now mocking the service globally, we need to test the original implementation
 jest.unmock('../config.service');
@@ -28,6 +30,17 @@ describe('ConfigService', () => {
 
   it('should throw an error if the discord token is not defined', () => {
     delete process.env.DISCORD_TOKEN;
+    
+    // Mock quotes file to prevent file system errors
+    const mockQuotes = {
+      generic_wandering_messages: ['hello'],
+      goblin_wandering_messages: {
+        'test-channel': ['test message'],
+      },
+    };
+    const yaml = dump(mockQuotes);
+    jest.spyOn(fs, 'readFileSync').mockReturnValue(yaml);
+    
     expect(() => new ConfigService()).toThrow(
       'DISCORD_TOKEN is not defined in the environment variables.',
     );
@@ -47,10 +60,20 @@ describe('ConfigService', () => {
     const configService = new ConfigService();
     expect(configService.get('quotes')).toEqual(mockQuotes);
   });
-});
-it('should load the cleanupMaxMessages from environment variables', () => {
+
+  it('should load the cleanupMaxMessages from environment variables', () => {
     process.env.DISCORD_TOKEN = 'test_token';
     process.env.CLEANUP_MAX_MESSAGES_PER_CHANNEL = '250';
+    
+    const mockQuotes = {
+      generic_wandering_messages: ['hello'],
+      goblin_wandering_messages: {
+        'test-channel': ['test message'],
+      },
+    };
+    const yaml = dump(mockQuotes);
+    jest.spyOn(fs, 'readFileSync').mockReturnValue(yaml);
+    
     const configService = new ConfigService();
     expect(configService.get('cleanupMaxMessages')).toBe(250);
   });
@@ -58,6 +81,17 @@ it('should load the cleanupMaxMessages from environment variables', () => {
   it('should use default cleanupMaxMessages if not in environment', () => {
     process.env.DISCORD_TOKEN = 'test_token';
     delete process.env.CLEANUP_MAX_MESSAGES_PER_CHANNEL;
+    
+    const mockQuotes = {
+      generic_wandering_messages: ['hello'],
+      goblin_wandering_messages: {
+        'test-channel': ['test message'],
+      },
+    };
+    const yaml = dump(mockQuotes);
+    jest.spyOn(fs, 'readFileSync').mockReturnValue(yaml);
+    
     const configService = new ConfigService();
     expect(configService.get('cleanupMaxMessages')).toBe(100);
   });
+});

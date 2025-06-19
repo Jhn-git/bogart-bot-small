@@ -104,3 +104,4 @@ docker-compose.override.yml
 
 # Deployment backups
 backups/
+cooldowns.json

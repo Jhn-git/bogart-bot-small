@@ -28,6 +28,7 @@ describe('ChannelDiscoveryService', () => {
     const permissions = new PermissionsBitField();
     if (canSend) {
       permissions.add(PermissionsBitField.Flags.SendMessages);
+      permissions.add(PermissionsBitField.Flags.ReadMessageHistory);
     }
     channel.permissionsFor.mockReturnValue(permissions);
     mockChannels.set(id, channel);
@@ -70,7 +71,8 @@ describe('ChannelDiscoveryService', () => {
     expect(channelNames).toContain('general');
     expect(channelNames).toContain('bot-commands');
     expect(channelNames).toContain('talk-to-me');
-    expect(channels).toHaveLength(3);
+    expect(channelNames).toContain('secret-lounge'); // Now allowed with blacklist approach
+    expect(channels).toHaveLength(4); // Updated count
   });
 
   it('should exclude channels where the bot cannot send messages', () => {
@@ -91,10 +93,20 @@ describe('ChannelDiscoveryService', () => {
     expect(channelNames).not.toContain('voice-chat');
   });
 
-  it('should exclude channels that do not match the naming pattern', () => {
+  it('should exclude channels that match blocked patterns', () => {
+    // Add a channel that should be blocked
+    createMockChannel('8', 'rules-and-info', ChannelType.GuildText, false, true);
+    createMockChannel('9', 'mod-only', ChannelType.GuildText, false, true);
+    
     const channels = channelDiscoveryService.discoverEligibleChannels(mockGuild);
     const channelNames = channels.map((c) => c.name);
-    expect(channelNames).not.toContain('secret-lounge');
+    
+    // These should be blocked by the blacklist
+    expect(channelNames).not.toContain('rules-and-info');
+    expect(channelNames).not.toContain('mod-only');
+    
+    // These should still be allowed
+    expect(channelNames).toContain('secret-lounge'); // Not in blacklist
   });
 
   it('should return an empty array if no channels are eligible', () => {
@@ -105,10 +117,10 @@ describe('ChannelDiscoveryService', () => {
 
   it('should return an empty array if guild has channels, but none are eligible', () => {
     mockChannels.clear();
-    createMockChannel('1', 'voice-1', ChannelType.GuildVoice, false, true);
-    createMockChannel('2', 'secret-stuff', ChannelType.GuildText, false, true);
-    createMockChannel('3', 'no-send-channel', ChannelType.GuildText, false, false);
-    createMockChannel('4', 'adults-only', ChannelType.GuildText, true, true);
+    createMockChannel('1', 'voice-1', ChannelType.GuildVoice, false, true); // Wrong type
+    createMockChannel('2', 'rules-channel', ChannelType.GuildText, false, true); // Blocked pattern
+    createMockChannel('3', 'no-send-channel', ChannelType.GuildText, false, false); // No permissions
+    createMockChannel('4', 'adults-only', ChannelType.GuildText, true, true); // NSFW
     const channels = channelDiscoveryService.discoverEligibleChannels(mockGuild);
     expect(channels).toHaveLength(0);
   });

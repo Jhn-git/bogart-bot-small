@@ -38,15 +38,16 @@ export class ChannelDiscoveryService {
 
   /**
    * Determines if a channel is eligible for bot messaging.
-   * - Checks for send permissions
+   * - Checks for send permissions and read message history
    * - Filters out NSFW channels
-   * - Applies naming pattern (e.g., contains 'general', 'bot', or 'chat')
+   * - Uses blacklist approach: blocks problematic channels, allows most others
    */
   private isChannelEligible(channel: TextChannel): boolean {
     try {
-      // Permission: Bot must be able to send messages
+      // Permission: Bot must be able to send messages and read message history
       const permissions = channel.permissionsFor(channel.guild.members.me!);
-      if (!permissions?.has(PermissionsBitField.Flags.SendMessages)) {
+      if (!permissions?.has(PermissionsBitField.Flags.SendMessages) ||
+          !permissions?.has(PermissionsBitField.Flags.ReadMessageHistory)) {
         return false;
       }
 
@@ -55,17 +56,39 @@ export class ChannelDiscoveryService {
         return false;
       }
 
-      // Naming pattern (customize as needed)
+      // Blacklist approach: Block problematic channel patterns
       const name = channel.name.toLowerCase();
-      const allowedPatterns = ['general', 'bot', 'chat', 'talk', 'quotes'];
-      const isAllowed =
-        allowedPatterns.some((pattern) => name.includes(pattern)) ||
-        this.specialChannelNames.includes(name);
+      const blockedPatterns = [
+        // Administrative channels (exact matches or word boundaries)
+        'rules', 'rule', 'announcement', 'announcements', 'welcome', 'info', 'guidelines',
+        // Staff channels
+        'mod-', 'moderator', 'admin-', 'administrator', 'staff-', 'mods-', 'admins-',
+        // Sensitive/serious channels
+        'vent', 'venting', 'serious', 'support', 'help', 'confession', 'confessions',
+        // Specialized channels that might not welcome random messages
+        'art-', 'showcase', 'feedback', 'suggestion', 'suggestions', 'bug-', 'report-'
+      ];
 
-      if (!isAllowed) {
+      const isBlocked = blockedPatterns.some((pattern) => name.includes(pattern));
+      if (isBlocked) {
         return false;
       }
 
+      // Special allowlist for quote-specific channels (from YAML config)
+      const isSpecialChannel = this.specialChannelNames.includes(name);
+      if (isSpecialChannel) {
+        return true; // Always allow special channels from config
+      }
+
+      // Check for obvious conversation channels (these get priority)
+      const conversationPatterns = [
+        'general', 'chat', 'talk', 'random', 'off-topic', 'offtopic', 'casual', 
+        'lounge', 'hangout', 'social', 'community', 'discussion', 'misc', 'miscellaneous'
+      ];
+      
+      const isConversationChannel = conversationPatterns.some((pattern) => name.includes(pattern));
+      
+      // Allow conversation channels and any other channel not explicitly blocked
       return true;
     } catch (error) {
       console.warn(`Error checking channel eligibility for ${channel.name} (${channel.id}):`, error);

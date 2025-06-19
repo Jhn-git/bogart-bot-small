@@ -154,7 +154,7 @@ describe('Multi-Guild Integration Test', () => {
     
     // Act: Trigger the wandering message logic
     // We access the private method for a direct and predictable test
-    await (wanderingService as any).sendWanderingMessages();
+    await (wanderingService as any).runDecisionCycle();
 
     // Assert: Check that sendMessage was called correctly
     expect(mockDiscordService.sendMessage).toHaveBeenCalledTimes(2);
@@ -211,7 +211,7 @@ describe('Multi-Guild Integration Test', () => {
     mockClient.guilds.cache.set(guild3.id, guild3);
 
     // Act
-    await (wanderingService as any).sendWanderingMessages();
+    await (wanderingService as any).runDecisionCycle();
 
     // Assert
     expect(mockDiscordService.sendMessage).toHaveBeenCalledTimes(1);

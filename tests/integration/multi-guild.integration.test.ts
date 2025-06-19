@@ -151,31 +151,30 @@ describe('Full End-to-End Multi-Guild Integration Test', () => {
 
     // Act: Trigger the wandering message logic
     // We access the private method for a direct and predictable test
-    await (wanderingService as any).sendWanderingMessages();
+    await (wanderingService as any).runDecisionCycle();
 
-    // Assert: Check that sendMessage was called correctly for each guild
-    expect(mockDiscordService.sendMessage).toHaveBeenCalledTimes(3);
+    // Assert: Check that sendMessage was called only once per cycle (anti-spam protection)
+    // New behavior: Only one message per cycle to prevent mass messaging incidents
+    expect(mockDiscordService.sendMessage).toHaveBeenCalledTimes(1);
 
-    // Check Guild One: one of the two eligible channels should have been used
-    const guild1Calls = (mockDiscordService.sendMessage as jest.Mock).mock.calls.filter(call =>
-      ['c1', 'c2'].includes(call[0])
-    );
-    expect(guild1Calls).toHaveLength(1);
-    expect(guild1Calls[0][1]).toBe('Hello there!');
-
-    // Check Guild Two: one of the two eligible channels should have been used
-    const guild2Calls = (mockDiscordService.sendMessage as jest.Mock).mock.calls.filter(call =>
-        ['c4', 'c5'].includes(call[0])
-    );
-    expect(guild2Calls).toHaveLength(1);
-    expect(guild2Calls[0][1]).toBe('Hello there!');
-
-    // Check Guild Four: should get a goblin message
-    const guild4Calls = (mockDiscordService.sendMessage as jest.Mock).mock.calls.filter(call =>
-        ['c9'].includes(call[0])
-    );
-    expect(guild4Calls).toHaveLength(1);
-    expect(guild4Calls[0][1]).toBe('Grrraaaah!');
+    // Check that exactly one message was sent to one of the eligible channels (anti-spam protection)
+    const allCalls = (mockDiscordService.sendMessage as jest.Mock).mock.calls;
+    expect(allCalls).toHaveLength(1);
+    
+    // Verify the message was sent to an eligible channel
+    const sentChannelId = allCalls[0][0];
+    const eligibleChannelIds = ['c1', 'c2', 'c4', 'c5', 'c9']; // All eligible channels across all guilds
+    expect(eligibleChannelIds).toContain(sentChannelId);
+    
+    // Verify appropriate message was sent based on channel
+    const sentMessage = allCalls[0][1];
+    if (sentChannelId === 'c9') {
+      // goblin channel gets special message
+      expect(sentMessage).toBe('Grrraaaah!');
+    } else {
+      // other channels get general message  
+      expect(sentMessage).toBe('Hello there!');
+    }
     
     // Check that no messages were sent to ineligible channels
     expect(mockDiscordService.sendMessage).not.toHaveBeenCalledWith('c3', expect.any(String));

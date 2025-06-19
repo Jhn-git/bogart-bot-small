@@ -123,3 +123,11 @@ The cleanup system has built-in safeguards:
 - Requires explicit confirmation (`--confirm` flag) for actual deletion
 - Defaults to dry-run mode for safety
 - Completely separate from bot startup - only runs via `npm run cleanup`
+
+## Development Guidelines
+
+### Commit Message Guidelines
+- Do not include detailed Claude AI information in commit messages
+- Keep commit messages concise and focused on the specific changes made
+- Avoid including internal AI-specific context or reasoning
+- I like commit messages with emojis on the headers

@@ -34,7 +34,7 @@ services:
       - QUOTES_FILE=/app/data/quotes.yaml
     volumes:
       - ./data/quotes.yaml:/app/data/quotes.yaml:ro
-      - ./data:/app/data:rw
+      - bogart-prod-data:/app/data:rw
       - bogart-prod-logs:/app/logs
     deploy:
       resources:
@@ -59,6 +59,8 @@ services:
 
 
 volumes:
+  bogart-prod-data:
+    driver: local
   bogart-prod-logs:
     driver: local
 

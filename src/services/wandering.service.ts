@@ -13,6 +13,8 @@ interface ChannelScore {
   minutesSinceLastMessage: number;
   botWasRecent: boolean;
   activityLevel: 'high' | 'medium' | 'low' | 'inactive';
+  botMessagePercentage: number;
+  humanActivityModifier: number;
 }
 
 interface ChannelCache {
@@ -298,9 +300,9 @@ export class WanderingService {
         const bestChannel = await this.findBestChannelInGuild(guild);
         if (bestChannel && bestChannel.score >= MIN_SCORE_THRESHOLD) {
           this.potentialTargets.push(bestChannel);
-          console.log(`✅ Guild ${guild.name}: Found candidate channel ${bestChannel.channel.name} (score: ${bestChannel.score})`);
+          console.log(`✅ Guild ${guild.name}: Found candidate channel ${bestChannel.channel.name} (score: ${bestChannel.score}, humans: ${bestChannel.participantCount}, bot%: ${bestChannel.botMessagePercentage})`);
         } else if (bestChannel) {
-          console.log(`❌ Guild ${guild.name}: Best channel ${bestChannel.channel.name} score too low (${bestChannel.score} < ${MIN_SCORE_THRESHOLD})`);
+          console.log(`❌ Guild ${guild.name}: Best channel ${bestChannel.channel.name} score too low (${bestChannel.score} < ${MIN_SCORE_THRESHOLD}, bot%: ${bestChannel.botMessagePercentage})`);
         } else {
           console.log(`❌ Guild ${guild.name}: No eligible channels found`);
         }
@@ -401,15 +403,43 @@ export class WanderingService {
         return null;
       }
 
-      // Participant diversity score
-      const uniqueAuthors = new Set(messageArray.map(m => m.author.id));
-      const participantCount = uniqueAuthors.size;
+      // Enhanced participant analysis: Human vs Bot
+      const humanAuthors = new Set<string>();
+      const botAuthors = new Set<string>();
+      let humanMessageCount = 0;
+      let botMessageCount = 0;
+      
+      for (const message of messageArray) {
+        if (message.author.bot) {
+          botAuthors.add(message.author.id);
+          botMessageCount++;
+        } else {
+          humanAuthors.add(message.author.id);
+          humanMessageCount++;
+        }
+      }
+      
+      const totalMessages = messageArray.length;
+      const botMessagePercentage = (botMessageCount / totalMessages) * 100;
+      const participantCount = humanAuthors.size; // Only count human participants
+      
+      // Human activity modifier based on bot percentage
+      let humanActivityModifier = 1.0;
+      if (botMessagePercentage > 75) {
+        humanActivityModifier = 0.1; // 90% penalty for bot-dominated channels
+      } else if (botMessagePercentage > 50) {
+        humanActivityModifier = 0.5; // 50% penalty for bot-heavy channels
+      } else if (botMessagePercentage < 25) {
+        humanActivityModifier = 1.2; // 20% bonus for human-centric channels
+      }
+      
+      // Participant diversity score (now based only on human authors)
       let diversityScore = Math.min(100, participantCount * 10); // Max 100 points
 
       // Recency score (more recent = higher score)
       let recencyScore = Math.max(0, 100 - minutesSinceLastMessage); // Max 100 points
       
-      // Bot presence penalty
+      // Bot presence penalty (our own bot)
       const botId = channel.client.user?.id;
       const recentMessages = messageArray.slice(-5); // Last 5 messages
       const botWasLastAuthor = lastMessage.author.id === botId;
@@ -423,14 +453,17 @@ export class WanderingService {
         recencyScore *= 0.5;
       }
 
-      const totalScore = diversityScore + recencyScore;
+      // Calculate base score first, then apply human activity modifier to final result
+      const baseScore = diversityScore + recencyScore;
+      const totalScore = baseScore * humanActivityModifier;
       
       let activityLevel: 'high' | 'medium' | 'low' | 'inactive';
-      if (participantCount >= 5 && minutesSinceLastMessage < 30) {
+      // Activity level now considers human participants and bot percentage
+      if (participantCount >= 5 && minutesSinceLastMessage < 30 && botMessagePercentage < 50) {
         activityLevel = 'high';
-      } else if (participantCount >= 3 && minutesSinceLastMessage < 120) {
+      } else if (participantCount >= 3 && minutesSinceLastMessage < 120 && botMessagePercentage < 75) {
         activityLevel = 'medium';
-      } else if (minutesSinceLastMessage < 360) {
+      } else if (minutesSinceLastMessage < 360 && botMessagePercentage < 90) {
         activityLevel = 'low';
       } else {
         activityLevel = 'inactive';
@@ -444,7 +477,9 @@ export class WanderingService {
         participantCount,
         minutesSinceLastMessage: Math.round(minutesSinceLastMessage),
         botWasRecent: botInRecentMessages,
-        activityLevel
+        activityLevel,
+        botMessagePercentage: Math.round(botMessagePercentage),
+        humanActivityModifier
       };
       
     } catch (error) {

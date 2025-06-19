@@ -3,6 +3,8 @@ import { DiscordService } from './discord.service';
 import { QuoteService } from './quote.service';
 import { GuildService } from './guild.service';
 import { ChannelDiscoveryService } from './channel-discovery.service';
+import * as fs from 'fs';
+import * as path from 'path';
 
 interface ChannelScore {
   channel: TextChannel;
@@ -55,6 +57,9 @@ const CIRCUIT_BREAKER_RESET_TIME = 60 * 60 * 1000; // 1 hour circuit breaker res
 const TIMESTAMP_CLEANUP_INTERVAL = 24 * 60 * 60 * 1000; // 24 hours - cleanup old timestamps
 const TIMESTAMP_MAX_AGE = 7 * 24 * 60 * 60 * 1000; // 7 days - max age for stored timestamps
 
+// Persistence Constants
+const COOLDOWNS_FILE = 'cooldowns.json';
+
 export class WanderingService {
   private discordService: DiscordService;
   private quoteService: QuoteService;
@@ -94,6 +99,9 @@ export class WanderingService {
     this.quoteService = quoteService;
     this.guildService = guildService;
     this.channelDiscoveryService = channelDiscoveryService;
+    
+    // Load persistent cooldowns on startup
+    this.loadCooldowns();
   }
 
   public start(): void {
@@ -141,6 +149,10 @@ export class WanderingService {
       clearInterval(this.cleanupIntervalId);
       this.cleanupIntervalId = null;
     }
+    
+    // Save cooldowns one final time before stopping
+    console.log('WanderingService: Saving cooldowns before shutdown...');
+    this.saveCooldowns();
     
     this.hasStartupDelayPassed = false;
     this.isProcessing = false;
@@ -525,6 +537,9 @@ export class WanderingService {
       this.lastGlobalMessageTime = now;
       this.messagesThisHour++;
       
+      // Save cooldowns to persistent storage immediately after updating
+      this.saveCooldowns();
+      
       console.log(`✅ WanderingService: Message sent successfully! Next visit to ${target.guildName} in ${Math.round(jitteredGuildCooldown / 1000 / 60 / 60 * 10) / 10} hours`);
       console.log(`📈 Messages this hour: ${this.messagesThisHour}/${MAX_MESSAGES_PER_HOUR}`);
     } else {
@@ -558,6 +573,64 @@ export class WanderingService {
     
     if (expiredKeys.length > 0) {
       console.log(`WanderingService: Cleaned up ${expiredKeys.length} old timestamp entries`);
+    }
+  }
+
+  /**
+   * Load cooldown timestamps from persistent storage
+   */
+  private loadCooldowns(): void {
+    try {
+      if (fs.existsSync(COOLDOWNS_FILE)) {
+        const data = fs.readFileSync(COOLDOWNS_FILE, 'utf8');
+        const cooldownsData = JSON.parse(data);
+        
+        // Validate and load cooldowns
+        if (cooldownsData && typeof cooldownsData === 'object') {
+          const now = Date.now();
+          let loadedCount = 0;
+          let expiredCount = 0;
+          
+          for (const [guildId, timestamp] of Object.entries(cooldownsData)) {
+            if (typeof timestamp === 'number' && timestamp > now) {
+              // Only load non-expired cooldowns
+              this.lastMessageTimestamps.set(guildId, timestamp);
+              loadedCount++;
+            } else {
+              expiredCount++;
+            }
+          }
+          
+          console.log(`WanderingService: Loaded ${loadedCount} active cooldowns from persistent storage (${expiredCount} expired cooldowns discarded)`);
+        }
+      } else {
+        console.log('WanderingService: No persistent cooldowns file found, starting fresh');
+      }
+    } catch (error) {
+      console.error('WanderingService: Error loading cooldowns from persistent storage:', error);
+      console.log('WanderingService: Continuing with empty cooldown state');
+    }
+  }
+
+  /**
+   * Save cooldown timestamps to persistent storage
+   */
+  private saveCooldowns(): void {
+    try {
+      const cooldownsData: { [guildId: string]: number } = {};
+      
+      // Convert Map to plain object for JSON serialization
+      for (const [guildId, timestamp] of this.lastMessageTimestamps.entries()) {
+        cooldownsData[guildId] = timestamp;
+      }
+      
+      // Write atomically by writing to temp file first, then renaming
+      const tempFile = COOLDOWNS_FILE + '.tmp';
+      fs.writeFileSync(tempFile, JSON.stringify(cooldownsData, null, 2));
+      fs.renameSync(tempFile, COOLDOWNS_FILE);
+      
+    } catch (error) {
+      console.error('WanderingService: Error saving cooldowns to persistent storage:', error);
     }
   }
 

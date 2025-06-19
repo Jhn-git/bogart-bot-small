@@ -27,6 +27,13 @@ async function main() {
     logProgress: true,
   };
 
+  console.log(`\nStarting cleanup with options:`, {
+    dryRun,
+    confirm,
+    hours,
+    cutoffTime: new Date(Date.now() - hours * 60 * 60 * 1000).toISOString()
+  });
+
   const result: MessageCleanupResult = await container.messageCleanupService.cleanupMessages(options);
 
   console.log('\nCleanup Summary:');

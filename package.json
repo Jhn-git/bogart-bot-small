@@ -12,6 +12,7 @@
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
     "lint": "echo \"Linting not configured yet\"",
+    "cleanup": "ts-node scripts/message-cleanup.ts",
     "validate": "npm run build && npm run test",
     "validate:system": "node scripts/validate-system.js",
     "setup": "npm install && npm run validate:system",

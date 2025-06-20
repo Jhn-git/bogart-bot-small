@@ -3,6 +3,7 @@ import { DiscordService } from './discord.service';
 import { QuoteService } from './quote.service';
 import { GuildService } from './guild.service';
 import { ChannelDiscoveryService } from './channel-discovery.service';
+import { ConfigService } from './config.service';
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -48,10 +49,8 @@ const GUILD_BATCH_INTERVAL = 2 * 60 * 1000; // 2 minutes between batches
 const CHANNEL_CACHE_DURATION = 60 * 60 * 1000; // 1 hour channel eligibility cache
 
 // Scoring Constants
-const MIN_SCORE_THRESHOLD = 50; // Minimum score to actually post
 const MAX_CHANNEL_INACTIVITY = 24 * 60 * 60 * 1000; // 24 hours max inactivity
 const MESSAGE_HISTORY_COUNT = 15; // Messages to analyze for scoring
-const LONELINESS_BONUS_POINTS_PER_DAY = 5; // Points added for each day since last visit
 
 // Safety Constants
 const MAX_MESSAGES_PER_HOUR = 15; // Increased for multi-guild support
@@ -67,6 +66,7 @@ export class WanderingService {
   private quoteService: QuoteService;
   private guildService: GuildService;
   private channelDiscoveryService: ChannelDiscoveryService;
+  private configService: ConfigService;
   
   // Timer Management
   private decisionCycleInterval: NodeJS.Timeout | null = null;
@@ -96,11 +96,13 @@ export class WanderingService {
     quoteService: QuoteService,
     guildService: GuildService,
     channelDiscoveryService: ChannelDiscoveryService,
+    configService: ConfigService,
   ) {
     this.discordService = discordService;
     this.quoteService = quoteService;
     this.guildService = guildService;
     this.channelDiscoveryService = channelDiscoveryService;
+    this.configService = configService;
     
     // Load persistent cooldowns on startup
     this.loadCooldowns();
@@ -312,11 +314,12 @@ export class WanderingService {
 
         // Find best channel in this guild
         const bestChannel = await this.findBestChannelInGuild(guild);
-        if (bestChannel && bestChannel.score >= MIN_SCORE_THRESHOLD) {
+        const minScoreThreshold = this.configService.get('minScoreThreshold');
+        if (bestChannel && bestChannel.score >= minScoreThreshold) {
           this.potentialTargets.push(bestChannel);
           console.log(`✅ Guild ${guild.name}: Found candidate channel ${bestChannel.channel.name} (score: ${bestChannel.score}, humans: ${bestChannel.participantCount}, bot%: ${bestChannel.botMessagePercentage}, loneliness+: ${bestChannel.lonelinessBonus})`);
         } else if (bestChannel) {
-          console.log(`❌ Guild ${guild.name}: Best channel ${bestChannel.channel.name} score too low (${bestChannel.score} < ${MIN_SCORE_THRESHOLD}, bot%: ${bestChannel.botMessagePercentage}, loneliness+: ${bestChannel.lonelinessBonus})`);
+          console.log(`❌ Guild ${guild.name}: Best channel ${bestChannel.channel.name} score too low (${bestChannel.score} < ${minScoreThreshold}, bot%: ${bestChannel.botMessagePercentage}, loneliness+: ${bestChannel.lonelinessBonus})`);
         } else {
           console.log(`❌ Guild ${guild.name}: No eligible channels found`);
         }
@@ -473,7 +476,7 @@ export class WanderingService {
       // Loneliness bonus: Add points based on time since last guild visit
       const lastGuildVisit = this.lastMessageTimestamps.get(guild.id) || 0;
       const daysSinceLastVisit = lastGuildVisit > 0 ? (now - lastGuildVisit) / (1000 * 60 * 60 * 24) : 0;
-      const lonelinessBonus = Math.floor(daysSinceLastVisit) * LONELINESS_BONUS_POINTS_PER_DAY;
+      const lonelinessBonus = Math.floor(daysSinceLastVisit) * this.configService.get('lonelinessBonusPointsPerDay');
 
       // Calculate base score first, then apply human activity modifier, penalties, and bonuses
       const baseScore = diversityScore + recencyScore;

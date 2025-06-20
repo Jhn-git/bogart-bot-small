@@ -6,6 +6,7 @@ import { DiscordService } from '../../src/services/discord.service';
 import { QuoteService } from '../../src/services/quote.service';
 import { GuildService } from '../../src/services/guild.service';
 import { ChannelDiscoveryService } from '../../src/services/channel-discovery.service';
+import { ConfigService } from '../../src/services/config.service';
 import { Client, Collection, Guild, TextChannel, ChannelType, PermissionsBitField, GuildMember } from 'discord.js';
 
 // Mock the config service before anything else
@@ -76,6 +77,7 @@ describe('Full End-to-End Multi-Guild Integration Test', () => {
   let mockGuildService: jest.Mocked<GuildService>;
   let mockChannelDiscoveryService: jest.Mocked<ChannelDiscoveryService>;
   let mockQuoteService: jest.Mocked<QuoteService>;
+  let mockConfigService: jest.Mocked<ConfigService>;
 
   // Helper to create mock messages with human activity for channel scoring
   const createMockMessage = (authorId: string, isBot: boolean, timestamp?: number): any => ({
@@ -167,11 +169,20 @@ describe('Full End-to-End Multi-Guild Integration Test', () => {
       }),
     } as unknown as jest.Mocked<QuoteService>;
 
+    mockConfigService = {
+      get: jest.fn().mockImplementation((key: string) => {
+        if (key === 'minScoreThreshold') return 30;
+        if (key === 'lonelinessBonusPointsPerDay') return 15;
+        return undefined;
+      }),
+    } as unknown as jest.Mocked<ConfigService>;
+
     wanderingService = new WanderingService(
       mockDiscordService,
       mockQuoteService,
       mockGuildService,
-      mockChannelDiscoveryService
+      mockChannelDiscoveryService,
+      mockConfigService
     );
   });
 

@@ -64,6 +64,7 @@ describe('Multi-Guild Integration Test', () => {
   let mockGuildService: jest.Mocked<GuildService>;
   let mockChannelDiscoveryService: jest.Mocked<ChannelDiscoveryService>;
   let mockQuoteService: jest.Mocked<QuoteService>;
+  let mockConfigService: jest.Mocked<ConfigService>;
 
   // Helper to create mock messages with human activity for channel scoring
   const createMockMessage = (authorId: string, isBot: boolean, timestamp?: number): any => ({
@@ -152,11 +153,20 @@ describe('Multi-Guild Integration Test', () => {
       getWanderingMessage: jest.fn().mockReturnValue('Hello there!'),
     } as unknown as jest.Mocked<QuoteService>;
 
+    mockConfigService = {
+      get: jest.fn().mockImplementation((key: string) => {
+        if (key === 'minScoreThreshold') return 30;
+        if (key === 'lonelinessBonusPointsPerDay') return 15;
+        return undefined;
+      }),
+    } as unknown as jest.Mocked<ConfigService>;
+
     wanderingService = new WanderingService(
       mockDiscordService,
       mockQuoteService,
       mockGuildService,
-      mockChannelDiscoveryService
+      mockChannelDiscoveryService,
+      mockConfigService
     );
   });
 

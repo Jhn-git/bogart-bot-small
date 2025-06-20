@@ -25,6 +25,7 @@ describe('WanderingService', () => {
   let mockQuoteService: jest.Mocked<QuoteService>;
   let mockGuildService: jest.Mocked<GuildService>;
   let mockChannelDiscoveryService: jest.Mocked<ChannelDiscoveryService>;
+  let mockConfigService: jest.Mocked<ConfigService>;
   let mockClient: jest.Mocked<Client>;
 
   beforeEach(() => {
@@ -71,15 +72,22 @@ channel_specific_wandering_messages: {}
       sendMessage: jest.fn().mockResolvedValue(true),
     } as unknown as jest.Mocked<DiscordService>;
 
-    const mockConfigService = {
-      get: jest.fn().mockReturnValue({
-        generic_wandering_messages: ['A wandering message.'],
-        goblin_wandering_messages: {
-          'goblin-cave': ['Grrraaaah!']
-        },
-        channel_specific_wandering_messages: {
-          'general': ['Hello general channel!']
-        },
+    mockConfigService = {
+      get: jest.fn().mockImplementation((key: string) => {
+        if (key === 'quotes') {
+          return {
+            generic_wandering_messages: ['A wandering message.'],
+            goblin_wandering_messages: {
+              'goblin-cave': ['Grrraaaah!']
+            },
+            channel_specific_wandering_messages: {
+              'general': ['Hello general channel!']
+            },
+          };
+        }
+        if (key === 'minScoreThreshold') return 30;
+        if (key === 'lonelinessBonusPointsPerDay') return 15;
+        return undefined;
       }),
     } as unknown as jest.Mocked<ConfigService>;
 
@@ -99,7 +107,8 @@ channel_specific_wandering_messages: {}
       mockDiscordService,
       mockQuoteService,
       mockGuildService,
-      mockChannelDiscoveryService
+      mockChannelDiscoveryService,
+      mockConfigService
     );
   });
 
@@ -419,7 +428,8 @@ channel_specific_wandering_messages: {}
           mockDiscordService,
           mockQuoteService,
           mockGuildService,
-          mockChannelDiscoveryService
+          mockChannelDiscoveryService,
+          mockConfigService
         );
 
         expect(fs.existsSync).toHaveBeenCalledWith(expect.stringContaining('cooldowns.json'));
@@ -472,7 +482,8 @@ channel_specific_wandering_messages: {}
             mockDiscordService,
             mockQuoteService,
             mockGuildService,
-            mockChannelDiscoveryService
+            mockChannelDiscoveryService,
+            mockConfigService
           );
           newService.stop();
         }).not.toThrow();

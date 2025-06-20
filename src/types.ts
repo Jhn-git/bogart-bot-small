@@ -14,6 +14,8 @@ export interface Config {
   quotes: Quotes;
   cleanupMaxMessages: number;
   botOwnerId?: string;
+  minScoreThreshold: number;
+  lonelinessBonusPointsPerDay: number;
 }
 export interface MessageCleanupOptions {
   dryRun?: boolean;

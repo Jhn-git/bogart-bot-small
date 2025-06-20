@@ -33,8 +33,8 @@ interface GuildBatch {
 }
 
 // Decision Cycle Constants
-const DECISION_CYCLE_BASE_INTERVAL = 10 * 60 * 1000; // 10 minutes base
-const DECISION_CYCLE_JITTER_PERCENT = 20; // ±20% jitter (8-12 minutes)
+const DECISION_CYCLE_BASE_INTERVAL = (parseInt(process.env.DECISION_CYCLE_MINUTES || '10', 10)) * 60 * 1000; // Configurable base interval
+const DECISION_CYCLE_JITTER_PERCENT = 20; // ±20% jitter
 const STARTUP_DELAY = 2 * 60 * 1000; // 2 minutes startup delay
 
 // Rate Limiting Constants  

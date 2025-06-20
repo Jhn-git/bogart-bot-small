@@ -23,13 +23,38 @@ export class ChannelDiscoveryService {
    */
   public discoverEligibleChannels(guild: Guild): TextChannel[] {
     try {
-      return guild.channels.cache
-        .filter(
-          (channel) =>
-            channel.type === ChannelType.GuildText &&
-            this.isChannelEligible(channel as TextChannel)
-        )
-        .map((channel) => channel as TextChannel);
+      const isDebugMode = process.env.NODE_ENV !== 'test' && process.env.LOG_LEVEL === 'debug';
+      
+      if (isDebugMode) {
+        console.log(`[Discovery] Starting channel discovery for guild ${guild.name} (${guild.id})`);
+      }
+      
+      const allChannels = guild.channels.cache;
+      const textChannels = allChannels.filter(channel => channel.type === ChannelType.GuildText);
+      
+      if (isDebugMode) {
+        console.log(`[Discovery] Found ${textChannels.size} text channels out of ${allChannels.size} total channels`);
+      }
+      
+      const eligibleChannels: TextChannel[] = [];
+      
+      for (const [channelId, channel] of textChannels) {
+        const textChannel = channel as TextChannel;
+        const isEligible = this.isChannelEligible(textChannel);
+        
+        if (isEligible) {
+          eligibleChannels.push(textChannel);
+        }
+      }
+      
+      if (isDebugMode) {
+        console.log(`[Discovery] Result: ${eligibleChannels.length} eligible channels found`);
+        if (eligibleChannels.length > 0) {
+          console.log(`[Discovery] Eligible channels: ${eligibleChannels.map(ch => `#${ch.name}`).join(', ')}`);
+        }
+      }
+      
+      return eligibleChannels;
     } catch (error) {
       console.error(`Error discovering channels in guild ${guild.name} (${guild.id}):`, error);
       return [];
@@ -44,20 +69,44 @@ export class ChannelDiscoveryService {
    */
   private isChannelEligible(channel: TextChannel): boolean {
     try {
+      const isDebugMode = process.env.NODE_ENV !== 'test' && process.env.LOG_LEVEL === 'debug';
+      
+      if (isDebugMode) {
+        console.log(`[Discovery] Checking channel #${channel.name} (ID: ${channel.id})...`);
+      }
+
+      // Check if it's a text channel (should always be true since we filter before calling this)
+      if (isDebugMode) {
+        console.log(`[Discovery] -> Is Text Channel? ✅ Yes.`);
+      }
+
       // Permission: Bot must be able to view channel, send messages and read message history
       const permissions = channel.permissionsFor(channel.guild.members.me!);
-      if (!permissions?.has(PermissionsBitField.Flags.ViewChannel) ||
-          !permissions?.has(PermissionsBitField.Flags.SendMessages) ||
-          !permissions?.has(PermissionsBitField.Flags.ReadMessageHistory)) {
-        // Only log permission issues in development/production, not during tests
-        if (process.env.NODE_ENV !== 'test' && process.env.LOG_LEVEL === 'debug') {
-          console.log(`⚠️  Channel ${channel.name} in ${channel.guild.name}: Missing permissions (ViewChannel: ${permissions?.has(PermissionsBitField.Flags.ViewChannel)}, SendMessages: ${permissions?.has(PermissionsBitField.Flags.SendMessages)}, ReadMessageHistory: ${permissions?.has(PermissionsBitField.Flags.ReadMessageHistory)})`);
+      const hasViewChannel = permissions?.has(PermissionsBitField.Flags.ViewChannel) || false;
+      const hasSendMessages = permissions?.has(PermissionsBitField.Flags.SendMessages) || false;
+      const hasReadHistory = permissions?.has(PermissionsBitField.Flags.ReadMessageHistory) || false;
+      
+      if (isDebugMode) {
+        console.log(`[Discovery] -> Has View Channel Perm? ${hasViewChannel ? '✅' : '❌'} ${hasViewChannel ? 'Yes' : 'No'}.`);
+        console.log(`[Discovery] -> Has Send Messages Perm? ${hasSendMessages ? '✅' : '❌'} ${hasSendMessages ? 'Yes' : 'No'}.`);
+        console.log(`[Discovery] -> Has Read History Perm? ${hasReadHistory ? '✅' : '❌'} ${hasReadHistory ? 'Yes' : 'No'}.`);
+      }
+      
+      if (!hasViewChannel || !hasSendMessages || !hasReadHistory) {
+        if (isDebugMode) {
+          console.log(`[Discovery] --> Channel #${channel.name} is INELIGIBLE (missing permissions).`);
         }
         return false;
       }
 
       // NSFW filter
+      if (isDebugMode) {
+        console.log(`[Discovery] -> Is NSFW? ${channel.nsfw ? '❌' : '✅'} ${channel.nsfw ? 'Yes (blocked)' : 'No'}.`);
+      }
       if (channel.nsfw) {
+        if (isDebugMode) {
+          console.log(`[Discovery] --> Channel #${channel.name} is INELIGIBLE (NSFW).`);
+        }
         return false;
       }
 
@@ -74,14 +123,30 @@ export class ChannelDiscoveryService {
         'art-', 'showcase', 'feedback', 'suggestion', 'suggestions', 'bug-', 'report-'
       ];
 
-      const isBlocked = blockedPatterns.some((pattern) => name.includes(pattern));
+      const blockedPattern = blockedPatterns.find((pattern) => name.includes(pattern));
+      const isBlocked = !!blockedPattern;
+      
+      if (isDebugMode) {
+        console.log(`[Discovery] -> Passes Blacklist Check? ${isBlocked ? '❌' : '✅'} ${isBlocked ? `No (keyword: '${blockedPattern}')` : 'Yes'}.`);
+      }
+      
       if (isBlocked) {
+        if (isDebugMode) {
+          console.log(`[Discovery] --> Channel #${channel.name} is INELIGIBLE (blacklisted pattern: '${blockedPattern}').`);
+        }
         return false;
       }
 
       // Special allowlist for quote-specific channels (from YAML config)
       const isSpecialChannel = this.specialChannelNames.includes(name);
+      if (isDebugMode) {
+        console.log(`[Discovery] -> Is Special Channel? ${isSpecialChannel ? '✅' : '❌'} ${isSpecialChannel ? 'Yes (from config)' : 'No'}.`);
+      }
+      
       if (isSpecialChannel) {
+        if (isDebugMode) {
+          console.log(`[Discovery] --> Channel #${channel.name} is ELIGIBLE (special channel from config).`);
+        }
         return true; // Always allow special channels from config
       }
 
@@ -92,10 +157,34 @@ export class ChannelDiscoveryService {
       ];
       const allowedPatterns = ['bot-commands'];
       
-      const isConversationChannel = conversationPatterns.some((pattern) => name.includes(pattern));
-      const isAllowedPattern = allowedPatterns.some((pattern) => name.includes(pattern));
+      const conversationPattern = conversationPatterns.find((pattern) => name.includes(pattern));
+      const isConversationChannel = !!conversationPattern;
+      
+      const allowedPattern = allowedPatterns.find((pattern) => name.includes(pattern));
+      const isAllowedPattern = !!allowedPattern;
+      
+      if (isDebugMode) {
+        console.log(`[Discovery] -> Is Conversation Channel? ${isConversationChannel ? '✅' : '❌'} ${isConversationChannel ? `Yes (pattern: '${conversationPattern}')` : 'No'}.`);
+        console.log(`[Discovery] -> Is Allowed Pattern? ${isAllowedPattern ? '✅' : '❌'} ${isAllowedPattern ? `Yes (pattern: '${allowedPattern}')` : 'No'}.`);
+      }
 
-      return isSpecialChannel || isConversationChannel || isAllowedPattern;
+      // If it passes all the safety checks (permissions, not NSFW, not blacklisted), 
+      // then it should be eligible unless it's a special restricted channel
+      const finalResult = true; // Allow any channel that passes basic safety checks
+      
+      if (isDebugMode) {
+        if (isSpecialChannel) {
+          console.log(`[Discovery] --> Channel #${channel.name} is ELIGIBLE (special channel from config).`);
+        } else if (isConversationChannel) {
+          console.log(`[Discovery] --> Channel #${channel.name} is ELIGIBLE (conversation channel).`);
+        } else if (isAllowedPattern) {
+          console.log(`[Discovery] --> Channel #${channel.name} is ELIGIBLE (allowed pattern).`);
+        } else {
+          console.log(`[Discovery] --> Channel #${channel.name} is ELIGIBLE (passes all safety checks).`);
+        }
+      }
+
+      return finalResult;
     } catch (error) {
       console.warn(`Error checking channel eligibility for ${channel.name} (${channel.id}):`, error);
       return false;

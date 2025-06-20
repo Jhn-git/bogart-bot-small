@@ -39,6 +39,7 @@ class Container {
       this.quoteService,
       this.guildService,
       this.channelDiscoveryService,
+      this.configService,
     );
     this.messageCleanupService = new MessageCleanupService(this.discordService, this.configService, this.guildService);
     

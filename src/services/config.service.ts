@@ -72,6 +72,19 @@ export class ConfigService {
     // Get bot owner ID (optional)
     const botOwnerId = process.env.BOT_OWNER_ID?.trim();
 
+    // Get scoring parameters with defaults from refine.md recommendations
+    const minScoreThresholdStr = process.env.MIN_SCORE_THRESHOLD || '30';
+    const minScoreThreshold = parseInt(minScoreThresholdStr, 10);
+    if (isNaN(minScoreThreshold) || minScoreThreshold < 1 || minScoreThreshold > 200) {
+      throw new Error(`MIN_SCORE_THRESHOLD must be a number between 1 and 200, got: ${minScoreThresholdStr}`);
+    }
+
+    const lonelinessBonusStr = process.env.LONELINESS_BONUS_POINTS_PER_DAY || '15';
+    const lonelinessBonusPointsPerDay = parseInt(lonelinessBonusStr, 10);
+    if (isNaN(lonelinessBonusPointsPerDay) || lonelinessBonusPointsPerDay < 0 || lonelinessBonusPointsPerDay > 100) {
+      throw new Error(`LONELINESS_BONUS_POINTS_PER_DAY must be a number between 0 and 100, got: ${lonelinessBonusStr}`);
+    }
+
     // Validate quotes structure
     if (!quotes || typeof quotes !== 'object') {
       throw new Error('Invalid quotes configuration: quotes must be an object');
@@ -94,6 +107,8 @@ export class ConfigService {
       quotes,
       cleanupMaxMessages,
       botOwnerId,
+      minScoreThreshold,
+      lonelinessBonusPointsPerDay,
     };
   }
 

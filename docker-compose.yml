@@ -29,7 +29,6 @@ services:
       target: production
     environment:
       - NODE_ENV=production
-      - LOG_LEVEL=info
       - ENABLE_METRICS=true
       - QUOTES_FILE=/app/data/quotes.yaml
     volumes:

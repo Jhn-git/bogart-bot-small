@@ -60,12 +60,19 @@ export class CommandService {
                     await command.execute(interaction, this.databaseService, this.guildService);
                 } catch (error) {
                     console.error('Error executing command:', error);
-                    const errorMessage = 'There was an error while executing this command!';
                     
-                    if (interaction.replied || interaction.deferred) {
-                        await interaction.followUp({ content: errorMessage, flags: MessageFlags.Ephemeral });
-                    } else {
-                        await interaction.reply({ content: errorMessage, flags: MessageFlags.Ephemeral });
+                    // Only try to respond if the interaction hasn't expired
+                    try {
+                        const errorMessage = 'There was an error while executing this command!';
+                        
+                        if (interaction.replied || interaction.deferred) {
+                            await interaction.followUp({ content: errorMessage, flags: MessageFlags.Ephemeral });
+                        } else {
+                            await interaction.reply({ content: errorMessage, flags: MessageFlags.Ephemeral });
+                        }
+                    } catch (replyError) {
+                        console.error('Discord client error:', replyError);
+                        // Interaction has expired, nothing we can do
                     }
                 }
             } else if (interaction.isButton()) {
@@ -313,31 +320,26 @@ export class CommandService {
 
         const embed = new EmbedBuilder()
             .setColor(0xFF6B35) // Orange for admin
-            .setTitle('🔧 Admin Configuration')
-            .setDescription('*Administrative controls for Bogart*')
+            .setTitle('🔧 Admin Info')
+            .setDescription('*Current Bogart settings and how to manage him*')
             .addFields(
                 {
-                    name: '⚙️ Current Settings',
-                    value: '• **Frequency**: Every 45 minutes (configurable)\n• **Channel Cooldown**: 2 hours\n• **Observation Period**: 24 hours for new servers\n• **Engagement Tracking**: Active',
+                    name: '⚙️ How Bogart Works',
+                    value: '• **Frequency**: Checks every 45 minutes\n• **Channel Cooldown**: 2 hours between messages per channel\n• **New Server Learning**: 24 hours observation period\n• **Multi-guild**: Same settings across all servers',
                     inline: false
                 },
                 {
-                    name: '🛠️ Available Controls',
-                    value: '• **Emergency Stop**: Temporarily disable all messaging\n• **Reset Learning**: Clear engagement data and start fresh\n• **Channel Whitelist**: Restrict to specific channels only\n• **Frequency Adjustment**: Change how often Bogart considers messaging',
+                    name: '🛠️ What You Can Do Right Now',
+                    value: '• **Delete his messages** → He\'ll get the hint and be less active\n• **Channel permissions** → Remove his access to channels you don\'t want him in\n• **Reactions** → Positive reactions encourage him, negative ones discourage him',
                     inline: false
                 },
                 {
-                    name: '📊 Server Analytics',
-                    value: '• **Engagement Score**: Community reception metrics\n• **Message History**: Track when and where Bogart has spoken\n• **Channel Performance**: Which channels work best\n• **Trend Analysis**: How reception changes over time',
-                    inline: false
-                },
-                {
-                    name: '🚨 Quick Actions',
-                    value: '*Note: Advanced admin controls are coming soon!*\n\nFor now, you can:\n• Delete Bogart\'s messages to signal he should be less active\n• Use channel permissions to restrict where he can speak\n• Contact support for major adjustments',
+                    name: '📊 Why No Custom Settings?',
+                    value: 'Bogart serves multiple Discord servers with shared settings. Per-server customization would require a complete rewrite. He\'s designed to adapt naturally through community feedback instead.',
                     inline: false
                 }
             )
-            .setFooter({ text: 'Advanced admin panel coming in future updates!' });
+            .setFooter({ text: 'Bogart learns from your community\'s behavior - no config needed!' });
 
         await interaction.reply({
             embeds: [embed],

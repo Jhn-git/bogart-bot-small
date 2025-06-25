@@ -2,8 +2,13 @@
 # Stage 1: Dependencies base (for caching)
 FROM node:18-alpine AS deps
 
-# Install dumb-init for proper signal handling
-RUN apk add --no-cache dumb-init
+# Install build dependencies for native modules like sqlite3
+RUN apk add --no-cache \
+    dumb-init \
+    python3 \
+    make \
+    g++ \
+    libc6-compat
 
 WORKDIR /app
 
@@ -11,12 +16,20 @@ WORKDIR /app
 COPY package*.json .npmrc ./
 
 # Install dependencies in a separate layer for caching
+# Use --ignore-scripts for speed, then rebuild sqlite3 manually
 ENV NPM_CONFIG_AUDIT=false NPM_CONFIG_FUND=false NPM_CONFIG_LOGLEVEL=error
 RUN npm ci --only=production --ignore-scripts && \
+    npm rebuild sqlite3 && \
     npm cache clean --force
 
 # Stage 2: Build stage  
 FROM node:18-alpine AS builder
+
+# Install build dependencies
+RUN apk add --no-cache \
+    python3 \
+    make \
+    g++
 
 WORKDIR /app
 

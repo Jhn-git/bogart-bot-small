@@ -20,7 +20,8 @@ describe('DiscordService', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     (mockConfigService.get as jest.Mock).mockReturnValue('test_token');
-    discordService = new DiscordService(mockConfigService);
+    const mockDatabaseService = { recordGuildJoin: jest.fn() } as any;
+    discordService = new DiscordService(mockConfigService, mockDatabaseService);
   });
 
   it('should login with the token from the config service', async () => {

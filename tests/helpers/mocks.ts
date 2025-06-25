@@ -1,13 +1,14 @@
 import { ConfigService } from '../../src/services/config.service';
 import { DiscordService } from '../../src/services/discord.service';
 import { QuoteService } from '../../src/services/quote.service';
-import { WanderingService } from '../../src/services/wandering.service';
+import { WanderingService } from '../../src/modules/wandering/wandering.service';
 import { Client, Collection, Guild, TextChannel } from 'discord.js';
+import { DatabaseService } from '../../src/services/database.service';
 
 jest.mock('../../src/services/config.service');
 jest.mock('../../src/services/discord.service');
 jest.mock('../../src/services/quote.service');
-jest.mock('../../src/services/wandering.service');
+jest.mock('../../src/modules/wandering/wandering.service');
 
 export const mockConfigService = new (ConfigService as jest.Mock)();
 export const mockQuoteService = new (QuoteService as jest.Mock)();
@@ -36,4 +37,13 @@ export const createMockTextChannel = (id: string, name: string): TextChannel => 
   const channel = Object.create(TextChannel.prototype);
   Object.assign(channel, { id, name, send: jest.fn() });
   return channel;
+};
+
+export const createMockDatabaseService = () => {
+  const mockDb = new DatabaseService() as jest.Mocked<DatabaseService>;
+  mockDb.all = jest.fn().mockResolvedValue([]);
+  mockDb.run = jest.fn().mockResolvedValue(undefined);
+  mockDb.get = jest.fn().mockResolvedValue(undefined);
+  mockDb.exec = jest.fn().mockResolvedValue(undefined);
+  return mockDb;
 };

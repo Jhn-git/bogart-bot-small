@@ -6,13 +6,21 @@
  * ChannelDiscoveryService to send a single, correctly-targeted message per guild.
  */
 
-import { WanderingService } from '../../src/services/wandering.service';
 import { DiscordService } from '../../src/services/discord.service';
 import { QuoteService } from '../../src/services/quote.service';
 import { GuildService } from '../../src/services/guild.service';
 import { ChannelDiscoveryService } from '../../src/services/channel-discovery.service';
 import { ConfigService } from '../../src/services/config.service';
 import { Client, Collection, Guild, TextChannel, ChannelType, PermissionsBitField, GuildMember } from 'discord.js';
+import container from '../../src/container';
+import { initialize as initializeWandering } from '../../src/modules/wandering';
+
+// Register core services for tests that use dynamic DI
+container.register('databaseService', (c) => c.databaseService);
+container.register('quoteService', (c) => c.quoteService);
+container.register('guildService', (c) => c.guildService);
+container.register('channelDiscoveryService', (c) => c.channelDiscoveryService);
+container.register('configService', (c) => c.configService);
 
 // Mock the external dependencies
 jest.mock('discord.js', () => {
@@ -58,7 +66,6 @@ jest.mock('discord.js', () => {
 jest.mock('../../src/services/config.service');
 
 describe('Multi-Guild Integration Test', () => {
-  let wanderingService: WanderingService;
   let mockDiscordService: jest.Mocked<DiscordService>;
   let mockClient: jest.Mocked<Client>;
   let mockGuildService: jest.Mocked<GuildService>;
@@ -127,6 +134,10 @@ describe('Multi-Guild Integration Test', () => {
     return mockGuild;
   };
 
+  beforeAll(() => {
+    initializeWandering(container);
+  });
+
   beforeEach(() => {
     jest.clearAllMocks();
     
@@ -160,14 +171,6 @@ describe('Multi-Guild Integration Test', () => {
         return undefined;
       }),
     } as unknown as jest.Mocked<ConfigService>;
-
-    wanderingService = new WanderingService(
-      mockDiscordService,
-      mockQuoteService,
-      mockGuildService,
-      mockChannelDiscoveryService,
-      mockConfigService
-    );
   });
 
   it('should send exactly one message per decision cycle to prevent spam', async () => {
@@ -203,9 +206,9 @@ describe('Multi-Guild Integration Test', () => {
     
     // Act: Trigger the wandering message logic
     // Manually set startup delay as complete to bypass timing
-    (wanderingService as any).hasStartupDelayPassed = true;
+    (container.resolve('wanderingService') as any).hasStartupDelayPassed = true;
     // We access the private method for a direct and predictable test
-    await (wanderingService as any).runDecisionCycle();
+    await (container.resolve('wanderingService') as any).runDecisionCycle();
 
     // Assert: Check that sendMessage was called exactly once per decision cycle
     // New behavior: Only one message per cycle to prevent spam
@@ -258,8 +261,8 @@ describe('Multi-Guild Integration Test', () => {
 
     // Act
     // Manually set startup delay as complete to bypass timing
-    (wanderingService as any).hasStartupDelayPassed = true;
-    await (wanderingService as any).runDecisionCycle();
+    (container.resolve('wanderingService') as any).hasStartupDelayPassed = true;
+    await (container.resolve('wanderingService') as any).runDecisionCycle();
 
     // Assert: Check that only one message was sent to the allowed guild
     expect(mockDiscordService.sendMessage).toHaveBeenCalledTimes(1);

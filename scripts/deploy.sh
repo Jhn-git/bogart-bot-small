@@ -250,7 +250,10 @@ rollback_deployment() {
     
     # Rebuild and deploy
     print_status "Rebuilding from previous commit..."
-    docker compose up --build -d
+    export DOCKER_BUILDKIT=1
+    export COMPOSE_DOCKER_CLI_BUILD=1
+    docker compose build --parallel
+    docker compose up -d
     
     # Wait for rollback to complete
     local max_wait=60
@@ -337,7 +340,13 @@ deploy() {
     fi
     
     print_status "Building and starting environment..."
-    docker compose up --build -d
+    # Enable BuildKit for better performance and caching
+    export DOCKER_BUILDKIT=1
+    export COMPOSE_DOCKER_CLI_BUILD=1
+    
+    # Use build cache and parallel building
+    docker compose build --parallel
+    docker compose up -d
     
     # Wait for containers to start and become healthy
     print_status "Waiting for containers to start and become healthy..."
@@ -443,7 +452,13 @@ update_deployment() {
     docker compose pull
     
     print_status "Building and starting updated environment..."
-    docker compose up --build -d
+    # Enable BuildKit for better performance and caching
+    export DOCKER_BUILDKIT=1
+    export COMPOSE_DOCKER_CLI_BUILD=1
+    
+    # Use build cache and parallel building
+    docker compose build --parallel
+    docker compose up -d
     
     # Wait for containers to start and become healthy
     print_status "Waiting for containers to start and become healthy..."

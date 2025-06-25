@@ -27,6 +27,9 @@ services:
       context: .
       dockerfile: Dockerfile
       target: production
+      cache_from:
+        - node:18-alpine
+        - bogart-bot:latest
     environment:
       - NODE_ENV=production
       - ENABLE_METRICS=true

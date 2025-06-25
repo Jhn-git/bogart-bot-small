@@ -29,12 +29,13 @@
     "discord.js": "^14.20.0",
     "dotenv": "^16.5.0",
     "js-yaml": "^4.1.0",
-    "reflect-metadata": "^0.1.13"
+    "reflect-metadata": "^0.1.13",
+    "sqlite3": "^5.1.7"
   },
   "devDependencies": {
+    "@types/jest": "^29.5.0",
     "@types/js-yaml": "^4.0.9",
     "@types/node": "^24.0.3",
-    "@types/jest": "^29.5.0",
     "@typescript-eslint/eslint-plugin": "^6.0.0",
     "@typescript-eslint/parser": "^6.0.0",
     "eslint": "^8.45.0",

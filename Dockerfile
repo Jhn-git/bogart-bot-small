@@ -1,62 +1,50 @@
 # Multi-stage Dockerfile for Bogart Discord Bot
-# Stage 1: Build stage
-FROM node:18-alpine AS builder
+# Stage 1: Dependencies base (for caching)
+FROM node:18-alpine AS deps
 
-# Set working directory
+# Install dumb-init for proper signal handling
+RUN apk add --no-cache dumb-init
+
 WORKDIR /app
 
-# Copy package files
-COPY package*.json ./
+# Copy package files and npm config for better layer caching
+COPY package*.json .npmrc ./
 
-# Install all dependencies (including dev dependencies for building)
-RUN npm ci
+# Install dependencies in a separate layer for caching
+ENV NPM_CONFIG_AUDIT=false NPM_CONFIG_FUND=false NPM_CONFIG_LOGLEVEL=error
+RUN npm ci --only=production --ignore-scripts && \
+    npm cache clean --force
+
+# Stage 2: Build stage  
+FROM node:18-alpine AS builder
+
+WORKDIR /app
+
+# Copy package files and npm config
+COPY package*.json .npmrc ./
+
+# Install ALL dependencies (including dev) for building  
+ENV NPM_CONFIG_AUDIT=false NPM_CONFIG_FUND=false NPM_CONFIG_LOGLEVEL=error
+RUN npm ci --ignore-scripts
 
 # Copy source code and configuration files
 COPY src ./src
 COPY tsconfig.json .
 COPY tsconfig.build.json .
 
-# List the copied files to debug the build context
-RUN ls -laR
-
-# Build the TypeScript code
-RUN npm run build:prod
-
-# Stage 2: Development stage
-FROM node:18-alpine AS development
-
-# Set working directory
-WORKDIR /app
-
-# Copy package files
-COPY package*.json ./
-
-# Install all dependencies (including dev dependencies)
-RUN npm ci
-
-# Copy source code and configuration
-COPY . .
-
-# Create directories for logs and data
-RUN mkdir -p /app/logs /app/data
-
-# Expose port for development
-EXPOSE 3000
-
-# Set environment variables for development
-ENV NODE_ENV=development
-ENV QUOTES_FILE=/app/data/quotes.yaml
-
-# Start the development server
-CMD ["npm", "run", "dev"]
+# Build the TypeScript code using production config
+RUN npm run build -- --project tsconfig.build.json
 
 # Stage 3: Production stage
 FROM node:18-alpine AS production
 
+# Install dumb-init for proper signal handling
+RUN apk add --no-cache dumb-init
+
 # Add metadata
 LABEL maintainer="Bogart Bot Team"
-LABEL description="Bogart Discord Bot - A goblin-themed Discord bot for movie watch-alongs"
-LABEL version="1.0.0"
+LABEL description="Bogart Discord Bot - Server companion with organic conversation timing"
+LABEL version="2.0.0"
 
 # Create app user for security
 RUN addgroup -g 1001 -S nodejs && \
@@ -65,12 +53,9 @@ RUN addgroup -g 1001 -S nodejs && \
 # Set working directory
 WORKDIR /app
 
-# Copy package files
-COPY package*.json ./
-
-# Install only production dependencies
-RUN npm ci --only=production --no-cache && \
-    npm cache clean --force
+# Copy production dependencies from deps stage (cached!)
+COPY --from=deps /app/node_modules ./node_modules
+COPY --from=deps /app/package.json ./package.json
 
 # Copy built application from builder stage
 COPY --from=builder /app/dist ./dist
@@ -85,16 +70,16 @@ RUN mkdir -p /app/logs /app/data && \
 # Switch to non-root user
 USER bogart
 
-# Health check
+# Health check - check if the bot process is running
 HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
-    CMD node -e "console.log('Bot health check - OK')" || exit 1
-
-# Expose port (if needed for future webhook support)
-EXPOSE 3000
+    CMD pgrep node > /dev/null || exit 1
 
 # Set environment variables
 ENV NODE_ENV=production
 ENV QUOTES_FILE=/app/data/quotes.yaml
+
+# Use dumb-init for proper signal handling
+ENTRYPOINT ["dumb-init", "--"]
 
 # Start the application
 CMD ["node", "dist/main.js"]

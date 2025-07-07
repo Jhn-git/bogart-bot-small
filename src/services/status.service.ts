@@ -7,10 +7,10 @@ export class StatusService {
   private isGoblinMessageActive: boolean = false;
   private lastGoblinMessageIndex: number = -1;
   
-  // Rotation settings - reduced frequency to minimize noise
-  private readonly ROTATION_INTERVAL_MS = 2 * 60 * 60 * 1000; // 2 hours (was 12 minutes)
-  private readonly GOBLIN_MESSAGE_PROBABILITY = 0.15; // 15% chance (was 20%)
-  private readonly GOBLIN_MESSAGE_DURATION = 20 * 60 * 1000; // 20 minutes (was 3 minutes)
+  // Rotation settings - very reduced frequency to minimize noise
+  private readonly ROTATION_INTERVAL_MS = 6 * 60 * 60 * 1000; // 6 hours (was 2 hours)
+  private readonly GOBLIN_MESSAGE_PROBABILITY = 0.1; // 10% chance (was 15%)
+  private readonly GOBLIN_MESSAGE_DURATION = 15 * 60 * 1000; // 15 minutes (was 20 minutes)
   
   // Goblin message templates (will include server count)
   private readonly goblinMessages = [

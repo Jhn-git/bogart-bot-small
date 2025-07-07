@@ -244,12 +244,19 @@ export class WanderingService {
       const bestGuild = await this.selectBestGuild(eligibleGuilds);
       if (bestGuild) {
         try {
-          await this.processGuildForMessage(bestGuild);
+          const messageResult = await this.processGuildForMessage(bestGuild);
+          if (messageResult) {
+            console.log(`WanderingService: Decision cycle complete. Message sent to #${messageResult.channelName} in '${bestGuild.name}'`);
+          } else {
+            console.log(`WanderingService: Decision cycle complete. No suitable channel found in '${bestGuild.name}' (permissions or cooldown issues)`);
+          }
         } catch (error) {
           console.error(`WanderingService: Error processing guild ${bestGuild.name}:`, error);
+          console.log(`WanderingService: Decision cycle complete. Failed to process guild '${bestGuild.name}' due to error`);
         }
       } else {
-        console.log('WanderingService: No suitable guild found for messaging');
+        const minThreshold = this.configService.get('minScoreThreshold');
+        console.log(`WanderingService: Decision cycle complete. No channel in any guild met the minimum score threshold of ${minThreshold}`);
       }
 
     } catch (error) {
@@ -303,7 +310,8 @@ export class WanderingService {
         const bestChannelScore = Math.max(...channelScores.map(cs => cs.score));
         
         // Only consider guilds with channels that meet the minimum threshold
-        if (bestChannelScore >= 50) {
+        const minThreshold = this.configService.get('minScoreThreshold');
+        if (bestChannelScore >= minThreshold) {
           guildScores.push({
             guild,
             bestScore: bestChannelScore,
@@ -316,7 +324,8 @@ export class WanderingService {
     }
     
     if (guildScores.length === 0) {
-      console.log('WanderingService: No guilds have channels meeting the minimum score threshold (50 points)');
+      const minThreshold = this.configService.get('minScoreThreshold');
+      console.log(`WanderingService: No guilds have channels meeting the minimum score threshold (${minThreshold} points)`);
       return null;
     }
     
@@ -337,8 +346,9 @@ export class WanderingService {
 
   /**
    * Process a single guild for potential messaging
+   * @returns Object with channel info if message was sent, null otherwise
    */
-  private async processGuildForMessage(guild: any): Promise<void> {
+  private async processGuildForMessage(guild: any): Promise<{channelName: string, channelId: string} | null> {
     const now = Date.now();
     
     console.log(`WanderingService: Processing selected guild '${guild.name}' (ID: ${guild.id})`);
@@ -349,20 +359,39 @@ export class WanderingService {
     
     if (allEligibleChannels.length === 0) {
       console.log(`WanderingService: No eligible channels in ${guild.name} - skipping`);
-      return;
+      return null;
     }
 
     // Filter out channels that are on cooldown (2 hours)
     const channelsOnCooldown = await this.db.getChannelsOnCooldown(guild.id);
-    const availableChannels = allEligibleChannels.filter(channel => 
+    const cooldownFilteredChannels = allEligibleChannels.filter(channel => 
       !channelsOnCooldown.includes(channel.id)
     );
 
-    console.log(`WanderingService: ${channelsOnCooldown.length} channels on cooldown, ${availableChannels.length} available`);
+    console.log(`WanderingService: ${channelsOnCooldown.length} channels on cooldown, ${cooldownFilteredChannels.length} available`);
+
+    if (cooldownFilteredChannels.length === 0) {
+      console.log(`WanderingService: All channels in ${guild.name} are on cooldown - skipping`);
+      return null;
+    }
+
+    // PRIORITY 1: Filter out channels without Send Messages permission BEFORE scoring
+    const availableChannels = cooldownFilteredChannels.filter(channel => {
+      const permissions = channel.permissionsFor(channel.guild.members.me!);
+      const hasSendMessages = permissions?.has(PermissionsBitField.Flags.SendMessages) || false;
+      
+      if (!hasSendMessages) {
+        console.log(`WanderingService: Skipping channel #${channel.name} (ID: ${channel.id}) in '${guild.name}' - Reason: Missing Send Messages permission`);
+        return false;
+      }
+      return true;
+    });
+
+    console.log(`WanderingService: ${cooldownFilteredChannels.length - availableChannels.length} channels filtered due to missing permissions, ${availableChannels.length} remain`);
 
     if (availableChannels.length === 0) {
-      console.log(`WanderingService: All channels in ${guild.name} are on cooldown - skipping`);
-      return;
+      console.log(`WanderingService: All channels in ${guild.name} lack Send Messages permission - skipping`);
+      return null;
     }
 
     // Calculate scores for available channels
@@ -372,11 +401,12 @@ export class WanderingService {
     channelScores.sort((a, b) => b.score - a.score);
     
     // Filter channels that meet the minimum score threshold
-    const eligibleChannelScores = channelScores.filter(cs => cs.score >= 50);
+    const minThreshold = this.configService.get('minScoreThreshold');
+    const eligibleChannelScores = channelScores.filter(cs => cs.score >= minThreshold);
     
     if (eligibleChannelScores.length === 0) {
-      console.log(`WanderingService: No channels in ${guild.name} meet the minimum score threshold (50 points)`);
-      return;
+      console.log(`WanderingService: No channels in ${guild.name} meet the minimum score threshold (${minThreshold} points)`);
+      return null;
     }
     
     // Log the top 3 channels for transparency
@@ -395,7 +425,7 @@ export class WanderingService {
     const quote = this.quoteService.getWanderingMessage(selectedChannel.name);
     if (!quote || quote === '...') {
       console.log('WanderingService: No quotes available for selected channel');
-      return;
+      return null;
     }
 
     // Final permission check before sending
@@ -404,7 +434,7 @@ export class WanderingService {
     
     if (!hasSendMessages) {
       console.warn(`WanderingService: Channel #${selectedChannel.name} no longer has Send Messages permission - skipping`);
-      return;
+      return null;
     }
 
     // Send the message
@@ -416,11 +446,14 @@ export class WanderingService {
         await this.saveCooldowns();
         await this.db.recordChannelMessage(selectedChannel.id, guild.id);
         console.log(`WanderingService: Successfully sent message to #${selectedChannel.name} in ${guild.name}`);
+        return { channelName: selectedChannel.name, channelId: selectedChannel.id };
       } else {
         console.warn(`WanderingService: Failed to send message to #${selectedChannel.name} in ${guild.name}`);
+        return null;
       }
     } catch (error) {
       console.error(`WanderingService: Error sending message to #${selectedChannel.name} in ${guild.name}:`, error);
+      return null;
     }
   }
 

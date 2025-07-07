@@ -240,13 +240,16 @@ export class WanderingService {
 
       console.log(`WanderingService: ${eligibleGuilds.length} guilds eligible for messaging`);
 
-      // Process eligible guilds (basic implementation for now)
-      for (const guild of eligibleGuilds) {
+      // Select and process ONE guild per cycle to prevent spam
+      const bestGuild = await this.selectBestGuild(eligibleGuilds);
+      if (bestGuild) {
         try {
-          await this.processGuildForMessage(guild);
+          await this.processGuildForMessage(bestGuild);
         } catch (error) {
-          console.error(`WanderingService: Error processing guild ${guild.name}:`, error);
+          console.error(`WanderingService: Error processing guild ${bestGuild.name}:`, error);
         }
+      } else {
+        console.log('WanderingService: No suitable guild found for messaging');
       }
 
     } catch (error) {
@@ -258,21 +261,86 @@ export class WanderingService {
   }
 
   /**
+   * Select the best guild from eligible guilds based on channel scores
+   */
+  private async selectBestGuild(eligibleGuilds: any[]): Promise<any | null> {
+    console.log(`WanderingService: Evaluating ${eligibleGuilds.length} guilds to select the best one`);
+    
+    const guildScores: { guild: any, bestScore: number, channelCount: number }[] = [];
+    
+    for (const guild of eligibleGuilds) {
+      try {
+        const now = Date.now();
+        const lastMessageTime = this.lastMessageTimestamps.get(guild.id) || 0;
+        const timeSinceLastMessage = now - lastMessageTime;
+        
+        // Skip guilds still on cooldown
+        if (timeSinceLastMessage < PER_GUILD_RATE_LIMIT_BASE) {
+          continue;
+        }
+        
+        // Get eligible channels for this guild
+        const allEligibleChannels = this.channelDiscoveryService.discoverEligibleChannels(guild);
+        if (allEligibleChannels.length === 0) {
+          continue;
+        }
+        
+        // Filter out channels that are on cooldown
+        const channelsOnCooldown = await this.db.getChannelsOnCooldown(guild.id);
+        const availableChannels = allEligibleChannels.filter(channel => 
+          !channelsOnCooldown.includes(channel.id)
+        );
+        
+        if (availableChannels.length === 0) {
+          continue;
+        }
+        
+        // Calculate scores for available channels
+        const channelScores = await this.calculateChannelScores(availableChannels, guild);
+        
+        // Find the best channel score in this guild
+        const bestChannelScore = Math.max(...channelScores.map(cs => cs.score));
+        
+        // Only consider guilds with channels that meet the minimum threshold
+        if (bestChannelScore >= 50) {
+          guildScores.push({
+            guild,
+            bestScore: bestChannelScore,
+            channelCount: availableChannels.length
+          });
+        }
+      } catch (error) {
+        console.error(`WanderingService: Error evaluating guild ${guild.name}:`, error);
+      }
+    }
+    
+    if (guildScores.length === 0) {
+      console.log('WanderingService: No guilds have channels meeting the minimum score threshold (50 points)');
+      return null;
+    }
+    
+    // Sort by best score (highest first)
+    guildScores.sort((a, b) => b.bestScore - a.bestScore);
+    
+    // Log the top 3 guilds for transparency
+    console.log('WanderingService: Guild evaluation results:');
+    guildScores.slice(0, 3).forEach((guildScore, index) => {
+      console.log(`  ${index + 1}. ${guildScore.guild.name}: ${guildScore.bestScore.toFixed(1)} points (${guildScore.channelCount} channels)`);
+    });
+    
+    const selectedGuild = guildScores[0].guild;
+    console.log(`WanderingService: Selected guild: ${selectedGuild.name} (best score: ${guildScores[0].bestScore.toFixed(1)})`);
+    
+    return selectedGuild;
+  }
+
+  /**
    * Process a single guild for potential messaging
    */
   private async processGuildForMessage(guild: any): Promise<void> {
     const now = Date.now();
-    const lastMessageTime = this.lastMessageTimestamps.get(guild.id) || 0;
-    const timeSinceLastMessage = now - lastMessageTime;
     
-    console.log(`WanderingService: Evaluating guild '${guild.name}' (ID: ${guild.id})`);
-    
-    // Check if guild is still on cooldown (6 hours)
-    if (timeSinceLastMessage < PER_GUILD_RATE_LIMIT_BASE) {
-      const remainingMinutes = Math.ceil((PER_GUILD_RATE_LIMIT_BASE - timeSinceLastMessage) / (60 * 1000));
-      console.log(`WanderingService: Guild ${guild.name} still on cooldown (${remainingMinutes} minutes remaining)`);
-      return;
-    }
+    console.log(`WanderingService: Processing selected guild '${guild.name}' (ID: ${guild.id})`);
 
     // Get eligible channels for this guild
     const allEligibleChannels = this.channelDiscoveryService.discoverEligibleChannels(guild);
@@ -302,15 +370,23 @@ export class WanderingService {
     // Sort channels by score (highest first)
     channelScores.sort((a, b) => b.score - a.score);
     
+    // Filter channels that meet the minimum score threshold
+    const eligibleChannelScores = channelScores.filter(cs => cs.score >= 50);
+    
+    if (eligibleChannelScores.length === 0) {
+      console.log(`WanderingService: No channels in ${guild.name} meet the minimum score threshold (50 points)`);
+      return;
+    }
+    
     // Log the top 3 channels for transparency
     console.log(`WanderingService: Channel scoring results for ${guild.name}:`);
-    channelScores.slice(0, 3).forEach((channelScore, index) => {
+    eligibleChannelScores.slice(0, 3).forEach((channelScore, index) => {
       console.log(`  ${index + 1}. #${channelScore.channel.name}: ${channelScore.score.toFixed(1)} points (activity: ${channelScore.activityLevel}, loneliness: +${channelScore.lonelinessBonus.toFixed(1)})`);
     });
 
     // Select the highest scoring channel
-    const selectedChannel = channelScores[0].channel;
-    const selectedScore = channelScores[0];
+    const selectedChannel = eligibleChannelScores[0].channel;
+    const selectedScore = eligibleChannelScores[0];
     
     console.log(`WanderingService: Selected #${selectedChannel.name} (score: ${selectedScore.score.toFixed(1)}, last message: ${selectedScore.minutesSinceLastMessage}m ago)`);
     
@@ -397,16 +473,23 @@ export class WanderingService {
           now - msg.createdTimestamp < 2 * 60 * 60 * 1000 // 2 hours
         );
         
-        // Determine activity level
-        if (recentMessages.size >= 10) activityLevel = 'high';
-        else if (recentMessages.size >= 5) activityLevel = 'medium';
-        else if (recentMessages.size >= 1) activityLevel = 'low';
+        // Determine activity level and assign standardized base scores
+        if (recentMessages.size >= 10) {
+          activityLevel = 'high';
+          score += 30; // High activity base score
+        } else if (recentMessages.size >= 5) {
+          activityLevel = 'medium';
+          score += 20; // Medium activity base score
+        } else if (recentMessages.size >= 1) {
+          activityLevel = 'low';
+          score += 10; // Low activity base score
+        }
         
-        // Base activity score
-        score += recentMessages.size * 2;
+        // Additional message count bonus (1 point per message)
+        score += recentMessages.size;
         
         // Diversity bonus (more participants = better)
-        score += participantCount * 5;
+        score += participantCount * 3;
         
         // Human activity modifier (prefer channels with more human activity)
         if (botMessagePercentage < 50) {

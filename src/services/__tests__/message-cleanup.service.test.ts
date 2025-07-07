@@ -90,7 +90,8 @@ describe('MessageCleanupService', () => {
       isReady: jest.fn().mockReturnValue(true),
     } as unknown as jest.Mocked<Client>;
 
-    mockDiscordService = new DiscordService({} as any) as jest.Mocked<DiscordService>;
+    const mockDatabaseService = { recordGuildJoin: jest.fn() } as any;
+    mockDiscordService = new DiscordService({} as any, mockDatabaseService) as jest.Mocked<DiscordService>;
     mockDiscordService.getClient = jest.fn().mockReturnValue(mockClient);
 
     mockConfigService = new ConfigService() as jest.Mocked<ConfigService>;

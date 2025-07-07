@@ -1,0 +1,9 @@
+# Docker Build Cache Optimization
+
+# Use BuildKit for better caching
+export DOCKER_BUILDKIT=1
+export COMPOSE_DOCKER_CLI_BUILD=1
+
+# For even better performance, you can use:
+# docker buildx create --use
+# docker buildx build --cache-from type=registry,ref=myregistry/cache --cache-to type=registry,ref=myregistry/cache .

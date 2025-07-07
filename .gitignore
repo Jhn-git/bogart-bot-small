@@ -107,5 +107,8 @@ backups/
 cooldowns.json
 .deploy_state/
 
+# SQLite database
+/data/bogart.sqlite
+/data/bogart.sqlite-journal
 
 claude-usage-tracker/

@@ -79,4 +79,25 @@ export class GuildService {
   public getAllowedGuildIds(): string[] {
     return [...this.allowedGuildIds];
   }
+
+  /**
+   * Send a message to a specific channel
+   */
+  public async sendMessageToChannel(channelId: string, message: string): Promise<boolean> {
+    try {
+      const client = this.discordService.getClient();
+      const channel = await client.channels.fetch(channelId);
+      
+      if (!channel || !channel.isTextBased() || channel.isDMBased()) {
+        console.log(`GuildService: Channel ${channelId} is not a guild text channel`);
+        return false;
+      }
+      
+      await channel.send(message);
+      return true;
+    } catch (error) {
+      console.error(`GuildService: Failed to send message to channel ${channelId}:`, error);
+      return false;
+    }
+  }
 }

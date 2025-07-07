@@ -8,6 +8,47 @@ yarn-error.log*
 dist
 *.tsbuildinfo
 
+# Testing files
+coverage/
+.nyc_output
+test-results/
+
+# Development files
+*.log
+logs/
+.deploy_state/
+backups/
+
+# Documentation
+docs/
+README.md
+CHANGELOG.md
+*.md
+
+# Scripts and configs not needed in container
+scripts/
+docker-compose.yml
+docker-compose.*.yml
+Dockerfile*
+
+# Development tools
+.eslintrc*
+.prettierrc*
+jest.config*
+
+# CI/CD
+.github/
+.gitlabci.yml
+
+# Package managers (keep package-lock.json for npm ci)
+yarn.lock
+
+# Development artifacts
+.roo/
+claude-usage-tracker/
+example_hub.ts
+next-steps.md
+
 # Environment files (will be provided via Docker)
 .env
 .env.local

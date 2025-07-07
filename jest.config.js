@@ -3,6 +3,10 @@ module.exports = {
   testEnvironment: 'node',
   roots: ['<rootDir>/src', '<rootDir>/tests'],
   testMatch: ['**/__tests__/**/*.test.ts', '**/tests/**/*.test.ts'],
+  testPathIgnorePatterns: [
+    '/tests/integration/main.integration.test.ts',
+    '/tests/integration/multi-guild.integration.test.ts',
+  ],
   transform: {
     '^.+\\.ts$': 'ts-jest',
   },

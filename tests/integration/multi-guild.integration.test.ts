@@ -1,13 +1,16 @@
 /**
  * @jest-environment node
  */
-import { WanderingService } from '../../src/services/wandering.service';
 import { DiscordService } from '../../src/services/discord.service';
 import { QuoteService } from '../../src/services/quote.service';
 import { GuildService } from '../../src/services/guild.service';
 import { ChannelDiscoveryService } from '../../src/services/channel-discovery.service';
 import { ConfigService } from '../../src/services/config.service';
 import { Client, Collection, Guild, TextChannel, ChannelType, PermissionsBitField, GuildMember } from 'discord.js';
+import container from '../../src/container';
+import { initialize as initializeWandering } from '../../src/modules/wandering';
+
+// Remove WanderingService import and references. Use container.resolve('wanderingService') for all usages in this file.
 
 // Mock the config service before anything else
 jest.mock('../../src/services/config.service', () => ({
@@ -71,7 +74,6 @@ jest.mock('discord.js', () => {
 });
 
 describe('Full End-to-End Multi-Guild Integration Test', () => {
-  let wanderingService: WanderingService;
   let mockDiscordService: jest.Mocked<DiscordService>;
   let mockClient: jest.Mocked<Client>;
   let mockGuildService: jest.Mocked<GuildService>;
@@ -140,6 +142,17 @@ describe('Full End-to-End Multi-Guild Integration Test', () => {
     return mockGuild;
   };
 
+  beforeAll(() => {
+    // Register core services for tests that use dynamic DI
+    container.register('databaseService', (c) => c.databaseService);
+    container.register('quoteService', (c) => c.quoteService);
+    container.register('guildService', (c) => c.guildService);
+    container.register('channelDiscoveryService', (c) => c.channelDiscoveryService);
+    container.register('configService', (c) => c.configService);
+
+    initializeWandering(container);
+  });
+
   beforeEach(() => {
     jest.clearAllMocks();
     
@@ -176,14 +189,6 @@ describe('Full End-to-End Multi-Guild Integration Test', () => {
         return undefined;
       }),
     } as unknown as jest.Mocked<ConfigService>;
-
-    wanderingService = new WanderingService(
-      mockDiscordService,
-      mockQuoteService,
-      mockGuildService,
-      mockChannelDiscoveryService,
-      mockConfigService
-    );
   });
 
   it('should validate the complete multi-guild workflow without ALLOWED_GUILD_IDS restrictions', async () => {
@@ -224,9 +229,9 @@ describe('Full End-to-End Multi-Guild Integration Test', () => {
 
     // Act: Trigger the wandering message logic
     // Manually set startup delay as complete to bypass timing
-    (wanderingService as any).hasStartupDelayPassed = true;
+    (container.resolve('wanderingService') as any).hasStartupDelayPassed = true;
     // We access the private method for a direct and predictable test
-    await (wanderingService as any).runDecisionCycle();
+    await (container.resolve('wanderingService') as any).runDecisionCycle();
 
     // Assert: Check that sendMessage was called exactly once per decision cycle
     // New behavior: Only one guild gets a message per cycle to prevent spam

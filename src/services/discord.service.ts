@@ -1,5 +1,7 @@
 import { Client, GatewayIntentBits, TextChannel } from 'discord.js';
 import { ConfigService } from './config.service';
+import { DatabaseService } from './database.service';
+import { CommandService } from './command.service';
 import { IStatusService } from '../types';
 
 // Forward declaration to avoid circular dependency
@@ -12,19 +14,27 @@ export interface INotificationService {
 export class DiscordService {
   private client: Client;
   private configService: ConfigService;
+  private databaseService: DatabaseService;
   private lastMessageTime: number = 0;
   private messagesSent: number = 0;
   private messageSendingDisabled: boolean = false;
   private statusService: IStatusService | null = null;
   private notificationService: INotificationService | null = null;
+  private commandService: CommandService | null = null;
 
-  constructor(configService: ConfigService) {
+  constructor(configService: ConfigService, databaseService: DatabaseService) {
     this.configService = configService;
+    this.databaseService = databaseService;
     this.client = new Client({
-      intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages],
+      intents: [
+        GatewayIntentBits.Guilds, 
+        GatewayIntentBits.GuildMessages,
+        GatewayIntentBits.MessageContent,
+        GatewayIntentBits.GuildMessageReactions
+      ],
     });
 
-    this.client.on('ready', () => {
+    this.client.on('ready', async () => {
       console.log(`Logged in as ${this.client.user?.tag}!`);
       console.log(`Connected to ${this.client.guilds.cache.size} servers`);
       
@@ -32,11 +42,24 @@ export class DiscordService {
       if (this.statusService && typeof this.statusService.start === 'function') {
         this.statusService.start();
       }
+
+      // Register slash commands when client is ready
+      if (this.commandService) {
+        await this.commandService.registerCommands();
+      }
     });
 
     this.client.on('guildCreate', async (guild) => {
       console.log(`Joined new server: ${guild.name} (${guild.id})`);
       console.log(`Now active in ${this.client.guilds.cache.size} servers`);
+      
+      // Record guild join for observation period tracking
+      try {
+        await this.databaseService.recordGuildJoin(guild.id);
+        console.log(`Started 24-hour observation period for ${guild.name}`);
+      } catch (error) {
+        console.error('Error recording guild join:', error);
+      }
       
       // Notify status service of guild count change
       if (this.statusService && typeof this.statusService.onGuildCountChange === 'function') {
@@ -81,11 +104,33 @@ export class DiscordService {
   }
 
   public async login(): Promise<void> {
-    try {
-      await this.client.login(this.configService.get('discordToken'));
-    } catch (error) {
-      console.error('Failed to log in:', error);
-      throw error;
+    const maxRetries = 5;
+    let retryCount = 0;
+    
+    while (retryCount < maxRetries) {
+      try {
+        await this.client.login(this.configService.get('discordToken'));
+        if (retryCount > 0) {
+          console.log(`Successfully logged in after ${retryCount} retries`);
+        }
+        return;
+      } catch (error: any) {
+        retryCount++;
+        
+        // Check if it's a DNS resolution error
+        if (error?.code === 'EAI_AGAIN' || error?.message?.includes('getaddrinfo')) {
+          const backoffMs = Math.min(1000 * Math.pow(2, retryCount), 30000);
+          console.error(`DNS resolution failed (attempt ${retryCount}/${maxRetries}). Retrying in ${backoffMs}ms...`);
+          
+          if (retryCount < maxRetries) {
+            await new Promise(resolve => setTimeout(resolve, backoffMs));
+            continue;
+          }
+        }
+        
+        console.error('Failed to log in:', error);
+        throw error;
+      }
     }
   }
 
@@ -153,5 +198,9 @@ export class DiscordService {
 
   public setNotificationService(notificationService: INotificationService): void {
     this.notificationService = notificationService;
+  }
+
+  public setCommandService(commandService: CommandService): void {
+    this.commandService = commandService;
   }
 }

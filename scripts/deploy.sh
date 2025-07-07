@@ -89,6 +89,10 @@ run_pre_merge_tests() {
     print_status "Pulling latest develop for testing..."
     git pull origin develop
     
+    # Install/update dependencies after pull
+    print_status "Installing/updating dependencies..."
+    npm install
+    
     # Run tests
     print_status "Running test suite..."
     if ! npm test; then

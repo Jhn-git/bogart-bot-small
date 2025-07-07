@@ -14,20 +14,20 @@ export class StatusService {
   // General goblin messages with activity types (80% of the time)
   private readonly generalGoblinMessages = [
     { message: 'some of my favorite shows in my goblin cave', type: ActivityType.Watching },
-    { message: 'to the sounds of the forest at night', type: ActivityType.Listening },
+    { message: 'the sounds of the forest at night', type: ActivityType.Listening },
     { message: 'ancient goblin lullabies by the campfire', type: ActivityType.Listening },
     { message: 'my daily mushroom hunt in the woods', type: ActivityType.Streaming },
     { message: 'hide and seek with woodland creatures', type: ActivityType.Playing },
     { message: 'my treasure collection by moonlight', type: ActivityType.Watching },
-    { message: 'to mysterious whispers in the wind', type: ActivityType.Listening },
+    { message: 'mysterious whispers in the wind', type: ActivityType.Listening },
     { message: 'the art of perfect rock polishing', type: ActivityType.Streaming },
     { message: 'a very serious game of acorn bowling', type: ActivityType.Playing },
     { message: 'the sunrise from my favorite tree branch', type: ActivityType.Watching },
-    { message: 'to stories told by wise old owls', type: ActivityType.Listening },
+    { message: 'stories told by wise old owls', type: ActivityType.Listening },
     { message: 'my epic quest for the shiniest pebble', type: ActivityType.Streaming },
     { message: 'peek-a-boo with curious squirrels', type: ActivityType.Playing },
     { message: 'clouds shape-shift into cheese wheels', type: ActivityType.Watching },
-    { message: 'to the symphony of rustling leaves', type: ActivityType.Listening },
+    { message: 'the symphony of rustling leaves', type: ActivityType.Listening },
     { message: 'my failed attempts at butterfly catching', type: ActivityType.Streaming },
     { message: 'tag with the neighborhood rabbits', type: ActivityType.Playing },
     { message: 'dewdrops race down flower petals', type: ActivityType.Watching }
@@ -36,11 +36,11 @@ export class StatusService {
   // Server count messages with activity types (20% of the time)
   private readonly serverCountMessages = [
     { message: 'over {count} goblin kingdoms', type: ActivityType.Watching },
-    { message: 'to whispers from {count} secret caves', type: ActivityType.Listening },
+    { message: 'whispers from {count} secret caves', type: ActivityType.Listening },
     { message: 'my treasure hunts across {count} realms', type: ActivityType.Streaming },
     { message: 'hide and seek in {count} magical forests', type: ActivityType.Playing },
     { message: 'the sunrise from {count} different mountains', type: ActivityType.Watching },
-    { message: 'to ancient songs from {count} mystical lands', type: ActivityType.Listening },
+    { message: 'ancient songs from {count} mystical lands', type: ActivityType.Listening },
     { message: 'my adventures through {count} enchanted places', type: ActivityType.Streaming },
     { message: 'pranks on friends in {count} goblin villages', type: ActivityType.Playing }
   ] as const;

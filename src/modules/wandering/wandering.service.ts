@@ -397,6 +397,15 @@ export class WanderingService {
       return;
     }
 
+    // Final permission check before sending
+    const permissions = selectedChannel.permissionsFor(selectedChannel.guild.members.me!);
+    const hasSendMessages = permissions?.has(PermissionsBitField.Flags.SendMessages) || false;
+    
+    if (!hasSendMessages) {
+      console.warn(`WanderingService: Channel #${selectedChannel.name} no longer has Send Messages permission - skipping`);
+      return;
+    }
+
     // Send the message
     try {
       const success = await this.guildService.sendMessageToChannel(selectedChannel.id, quote);
@@ -410,7 +419,7 @@ export class WanderingService {
         console.warn(`WanderingService: Failed to send message to #${selectedChannel.name} in ${guild.name}`);
       }
     } catch (error) {
-      console.error(`WanderingService: Error sending message to ${guild.name}:`, error);
+      console.error(`WanderingService: Error sending message to #${selectedChannel.name} in ${guild.name}:`, error);
     }
   }
 

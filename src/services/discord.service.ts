@@ -88,14 +88,7 @@ export class DiscordService {
         this.statusService.onGuildCountChange();
       }
 
-      // Send bot owner notification
-      if (this.notificationService) {
-        try {
-          await this.notificationService.notifyBotOwnerOnGuildLeave(guild);
-        } catch (error) {
-          console.error('Error sending guild leave notification:', error);
-        }
-      }
+      // Guild leave notification removed per user request
     });
 
     this.client.on('error', (error) => {

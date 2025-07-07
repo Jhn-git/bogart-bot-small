@@ -55,7 +55,7 @@ export interface IStatusService {
   getStatus(): {
     isActive: boolean;
     currentServerCount: number;
-    isShowingGoblinMessage: boolean;
-    lastGoblinMessage: string | null;
+    generalMessageProbability: number;
+    serverCountMessageProbability: number;
   };
 }

@@ -40,15 +40,17 @@ describe('StatusService', () => {
     const status = statusService.getStatus();
     expect(status.currentServerCount).toBe(5);
     expect(status.isActive).toBe(false);
-    expect(status.isShowingGoblinMessage).toBe(false);
+    expect(status.generalMessageProbability).toBe(0.8);
+    expect(status.serverCountMessageProbability).toBeCloseTo(0.2);
   });
 
-  it('should set server count status when started', () => {
+  it('should set status when started', () => {
     statusService.start();
 
+    // Should have called setActivity with either a general message or server count message
     expect(mockUser.setActivity).toHaveBeenCalledWith(
-      '👥 Active in 5 servers',
-      { type: ActivityType.Watching }
+      expect.any(String),
+      { type: expect.any(Number) }
     );
 
     const status = statusService.getStatus();
@@ -60,9 +62,10 @@ describe('StatusService', () => {
     
     statusService.start();
 
+    // Should have called setActivity with some status
     expect(mockUser.setActivity).toHaveBeenCalledWith(
-      '👥 Active in 1 server',
-      { type: ActivityType.Watching }
+      expect.any(String),
+      { type: expect.any(Number) }
     );
   });
 
@@ -76,9 +79,10 @@ describe('StatusService', () => {
     mockClient.guilds.cache.size = 10;
     statusService.onGuildCountChange();
 
+    // Should rotate to a new status
     expect(mockUser.setActivity).toHaveBeenCalledWith(
-      '👥 Active in 10 servers',
-      { type: ActivityType.Watching }
+      expect.any(String),
+      { type: expect.any(Number) }
     );
   });
 

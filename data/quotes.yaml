@@ -1,8 +1,8 @@
 # This file contains various pre-defined messages used by the "Bogart" goblin bot.
 # These messages are categorized for different scenarios, such as:
 # - Fallback responses when the LLM is unavailable or confused.
-# - Channel-specific "wandering" messages (e.g., for 'goblin-cave', 'murky-swamp').
-# - Generic "wandering" messages used in other channels.
+# - Channel-specific "wandering" messages for specific channel names (e.g., 'goblin-cave', 'murky-swamp').
+# - Generic "wandering" messages used in channels without specific messages.
 # - Messages related to the watch-along event (morning, afternoon excitement, start announcements).
 # - Bot status updates.
 # - Interaction messages when Bogart responds to a user.

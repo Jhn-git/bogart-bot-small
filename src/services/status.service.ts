@@ -4,24 +4,45 @@ import { DiscordService } from './discord.service';
 export class StatusService {
   private discordService: DiscordService;
   private rotationInterval: NodeJS.Timeout | null = null;
-  private isGoblinMessageActive: boolean = false;
   private lastGoblinMessageIndex: number = -1;
   
-  // Rotation settings - very reduced frequency to minimize noise
-  private readonly ROTATION_INTERVAL_MS = 6 * 60 * 60 * 1000; // 6 hours (was 2 hours)
-  private readonly GOBLIN_MESSAGE_PROBABILITY = 0.1; // 10% chance (was 15%)
-  private readonly GOBLIN_MESSAGE_DURATION = 15 * 60 * 1000; // 15 minutes (was 20 minutes)
+  // Rotation settings - 80% general goblin messages, 20% server count
+  private readonly ROTATION_INTERVAL_MS = 2 * 60 * 60 * 1000; // 2 hours rotation
+  private readonly GENERAL_MESSAGE_PROBABILITY = 0.8; // 80% chance for general goblin messages
+  private readonly STATUS_DURATION = 2 * 60 * 60 * 1000; // Status lasts until next rotation
   
-  // Goblin message templates (will include server count)
-  private readonly goblinMessages = [
-    '🍄 Collecting mushrooms in {count} caves',
-    '✨ Guarding treasures in {count} lairs',
-    '🎭 Causing mischief across {count} realms',
-    '📚 Reading goblin lore in {count} libraries',
-    '🏠 Cozy in {count} goblin homes',
-    '🔍 Exploring {count} mysterious places',
-    '🎪 Entertaining goblins in {count} kingdoms',
-    '🗝️ Finding secrets in {count} dungeons'
+  // General goblin messages with activity types (80% of the time)
+  private readonly generalGoblinMessages = [
+    { message: 'some of my favorite shows in my goblin cave', type: ActivityType.Watching },
+    { message: 'to the sounds of the forest at night', type: ActivityType.Listening },
+    { message: 'ancient goblin lullabies by the campfire', type: ActivityType.Listening },
+    { message: 'my daily mushroom hunt in the woods', type: ActivityType.Streaming },
+    { message: 'hide and seek with woodland creatures', type: ActivityType.Playing },
+    { message: 'my treasure collection by moonlight', type: ActivityType.Watching },
+    { message: 'to mysterious whispers in the wind', type: ActivityType.Listening },
+    { message: 'the art of perfect rock polishing', type: ActivityType.Streaming },
+    { message: 'a very serious game of acorn bowling', type: ActivityType.Playing },
+    { message: 'the sunrise from my favorite tree branch', type: ActivityType.Watching },
+    { message: 'to stories told by wise old owls', type: ActivityType.Listening },
+    { message: 'my epic quest for the shiniest pebble', type: ActivityType.Streaming },
+    { message: 'peek-a-boo with curious squirrels', type: ActivityType.Playing },
+    { message: 'clouds shape-shift into cheese wheels', type: ActivityType.Watching },
+    { message: 'to the symphony of rustling leaves', type: ActivityType.Listening },
+    { message: 'my failed attempts at butterfly catching', type: ActivityType.Streaming },
+    { message: 'tag with the neighborhood rabbits', type: ActivityType.Playing },
+    { message: 'dewdrops race down flower petals', type: ActivityType.Watching }
+  ] as const;
+
+  // Server count messages with activity types (20% of the time)
+  private readonly serverCountMessages = [
+    { message: 'over {count} goblin kingdoms', type: ActivityType.Watching },
+    { message: 'to whispers from {count} secret caves', type: ActivityType.Listening },
+    { message: 'my treasure hunts across {count} realms', type: ActivityType.Streaming },
+    { message: 'hide and seek in {count} magical forests', type: ActivityType.Playing },
+    { message: 'the sunrise from {count} different mountains', type: ActivityType.Watching },
+    { message: 'to ancient songs from {count} mystical lands', type: ActivityType.Listening },
+    { message: 'my adventures through {count} enchanted places', type: ActivityType.Streaming },
+    { message: 'pranks on friends in {count} goblin villages', type: ActivityType.Playing }
   ] as const;
 
   constructor(discordService: DiscordService) {
@@ -31,8 +52,8 @@ export class StatusService {
   public start(): void {
     console.log('StatusService: Starting status management...');
     
-    // Set initial status
-    this.updateServerCountStatus();
+    // Set initial status (use 80/20 logic)
+    this.rotateStatus();
     
     // Start rotation timer
     this.startRotationTimer();
@@ -48,56 +69,36 @@ export class StatusService {
   }
 
   public onGuildCountChange(): void {
-    // Update status immediately when bot joins/leaves servers
-    if (!this.isGoblinMessageActive) {
-      this.updateServerCountStatus();
-    }
+    // Immediately rotate to show new status when guild count changes
+    this.rotateStatus();
   }
 
   private startRotationTimer(): void {
     this.rotationInterval = setInterval(() => {
-      this.considerRotation();
+      this.rotateStatus();
     }, this.ROTATION_INTERVAL_MS);
   }
 
-  private considerRotation(): void {
-    // Don't rotate if already showing goblin message
-    if (this.isGoblinMessageActive) {
-      return;
-    }
-
-    // 20% chance to show goblin message
-    if (Math.random() < this.GOBLIN_MESSAGE_PROBABILITY) {
-      this.showGoblinMessage();
+  private rotateStatus(): void {
+    // 80% chance for general goblin message, 20% chance for server count
+    if (Math.random() < this.GENERAL_MESSAGE_PROBABILITY) {
+      this.showGeneralGoblinMessage();
+    } else {
+      this.showServerCountMessage();
     }
   }
 
-  private showGoblinMessage(): void {
-    const serverCount = this.getCurrentServerCount();
-    const goblinMessage = this.getRandomGoblinMessage(serverCount);
-    
-    console.log(`StatusService: Showing goblin message: "${goblinMessage}"`);
-    
-    this.setStatus(goblinMessage, ActivityType.Playing);
-    this.isGoblinMessageActive = true;
-    
-    // Return to server count after duration
-    setTimeout(() => {
-      this.returnToServerCountStatus();
-    }, this.GOBLIN_MESSAGE_DURATION);
+  private showGeneralGoblinMessage(): void {
+    const messageData = this.getRandomGeneralMessage();
+    console.log(`StatusService: Showing general goblin message: "${messageData.message}" (${ActivityType[messageData.type]})`);
+    this.setStatus(messageData.message, messageData.type);
   }
 
-  private returnToServerCountStatus(): void {
-    this.isGoblinMessageActive = false;
-    this.updateServerCountStatus();
-    // Reduced logging verbosity - only log when important
-  }
-
-  private updateServerCountStatus(): void {
+  private showServerCountMessage(): void {
     const serverCount = this.getCurrentServerCount();
-    const statusMessage = `👥 Active in ${serverCount} server${serverCount !== 1 ? 's' : ''}`;
-    
-    this.setStatus(statusMessage, ActivityType.Watching);
+    const messageData = this.getRandomServerCountMessage(serverCount);
+    console.log(`StatusService: Showing server count message: "${messageData.message}" (${ActivityType[messageData.type]})`);
+    this.setStatus(messageData.message, messageData.type);
   }
 
   private getCurrentServerCount(): number {
@@ -105,17 +106,23 @@ export class StatusService {
     return client.guilds.cache.size;
   }
 
-  private getRandomGoblinMessage(serverCount: number): string {
+  private getRandomGeneralMessage(): { message: string; type: ActivityType } {
+    const messageIndex = Math.floor(Math.random() * this.generalGoblinMessages.length);
+    return this.generalGoblinMessages[messageIndex];
+  }
+
+  private getRandomServerCountMessage(serverCount: number): { message: string; type: ActivityType } {
     // Avoid repeating the same message
     let messageIndex;
     do {
-      messageIndex = Math.floor(Math.random() * this.goblinMessages.length);
-    } while (messageIndex === this.lastGoblinMessageIndex && this.goblinMessages.length > 1);
+      messageIndex = Math.floor(Math.random() * this.serverCountMessages.length);
+    } while (messageIndex === this.lastGoblinMessageIndex && this.serverCountMessages.length > 1);
     
     this.lastGoblinMessageIndex = messageIndex;
     
-    const template = this.goblinMessages[messageIndex];
-    return template.replace('{count}', serverCount.toString());
+    const template = this.serverCountMessages[messageIndex];
+    const message = template.message.replace('{count}', serverCount.toString());
+    return { message, type: template.type };
   }
 
   private setStatus(message: string, type: ActivityType): void {
@@ -123,10 +130,7 @@ export class StatusService {
       const client = this.discordService.getClient();
       if (client.user) {
         client.user.setActivity(message, { type });
-        // Only log status changes when they're meaningful (goblin messages or errors)
-        if (type === ActivityType.Playing) {
-          console.log(`StatusService: Status set to "${message}"`);
-        }
+        console.log(`StatusService: Status set to "${ActivityType[type]} ${message}"`);
       } else {
         console.warn('StatusService: Client user not available for status update');
       }
@@ -138,17 +142,14 @@ export class StatusService {
   public getStatus(): {
     isActive: boolean;
     currentServerCount: number;
-    isShowingGoblinMessage: boolean;
-    lastGoblinMessage: string | null;
+    generalMessageProbability: number;
+    serverCountMessageProbability: number;
   } {
-    const serverCount = this.getCurrentServerCount();
     return {
       isActive: this.rotationInterval !== null,
-      currentServerCount: serverCount,
-      isShowingGoblinMessage: this.isGoblinMessageActive,
-      lastGoblinMessage: this.lastGoblinMessageIndex >= 0 
-        ? this.getRandomGoblinMessage(serverCount) 
-        : null
+      currentServerCount: this.getCurrentServerCount(),
+      generalMessageProbability: this.GENERAL_MESSAGE_PROBABILITY,
+      serverCountMessageProbability: 1 - this.GENERAL_MESSAGE_PROBABILITY
     };
   }
 }

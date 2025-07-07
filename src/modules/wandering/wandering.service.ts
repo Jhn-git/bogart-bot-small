@@ -257,6 +257,7 @@ export class WanderingService {
     } finally {
       this.isProcessing = false;
       this.lastDecisionCycleTime = Date.now();
+      console.log('WanderingService: Decision cycle completed');
     }
   }
 

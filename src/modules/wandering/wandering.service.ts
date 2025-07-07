@@ -377,14 +377,27 @@ export class WanderingService {
 
     // PRIORITY 1: Filter out channels without Send Messages permission BEFORE scoring
     const availableChannels = cooldownFilteredChannels.filter(channel => {
-      const permissions = channel.permissionsFor(channel.guild.members.me!);
-      const hasSendMessages = permissions?.has(PermissionsBitField.Flags.SendMessages) || false;
-      
-      if (!hasSendMessages) {
-        console.log(`WanderingService: Skipping channel #${channel.name} (ID: ${channel.id}) in '${guild.name}' - Reason: Missing Send Messages permission`);
+      try {
+        const botMember = channel.guild.members.me;
+        if (!botMember) {
+          console.log(`WanderingService: Skipping channel #${channel.name} (ID: ${channel.id}) in '${guild.name}' - Reason: Bot member not found`);
+          return false;
+        }
+        
+        // Get channel-specific permissions (includes overrides)
+        const permissions = channel.permissionsFor(botMember);
+        const hasViewChannel = permissions?.has(PermissionsBitField.Flags.ViewChannel) || false;
+        const hasSendMessages = permissions?.has(PermissionsBitField.Flags.SendMessages) || false;
+        
+        if (!hasViewChannel || !hasSendMessages) {
+          console.log(`WanderingService: Skipping channel #${channel.name} (ID: ${channel.id}) in '${guild.name}' - Reason: Missing permissions (View: ${hasViewChannel}, Send: ${hasSendMessages})`);
+          return false;
+        }
+        return true;
+      } catch (error) {
+        console.log(`WanderingService: Skipping channel #${channel.name} (ID: ${channel.id}) in '${guild.name}' - Reason: Error checking permissions:`, error);
         return false;
       }
-      return true;
     });
 
     console.log(`WanderingService: ${cooldownFilteredChannels.length - availableChannels.length} channels filtered due to missing permissions, ${availableChannels.length} remain`);
@@ -428,12 +441,25 @@ export class WanderingService {
       return null;
     }
 
-    // Final permission check before sending
-    const permissions = selectedChannel.permissionsFor(selectedChannel.guild.members.me!);
-    const hasSendMessages = permissions?.has(PermissionsBitField.Flags.SendMessages) || false;
-    
-    if (!hasSendMessages) {
-      console.warn(`WanderingService: Channel #${selectedChannel.name} no longer has Send Messages permission - skipping`);
+    // Final permission check before sending (double-check with detailed logging)
+    try {
+      const botMember = selectedChannel.guild.members.me;
+      if (!botMember) {
+        console.warn(`WanderingService: Bot member not found in guild ${guild.name} - skipping`);
+        return null;
+      }
+      
+      const permissions = selectedChannel.permissionsFor(botMember);
+      const hasViewChannel = permissions?.has(PermissionsBitField.Flags.ViewChannel) || false;
+      const hasSendMessages = permissions?.has(PermissionsBitField.Flags.SendMessages) || false;
+      
+      if (!hasViewChannel || !hasSendMessages) {
+        console.warn(`WanderingService: Channel #${selectedChannel.name} permission check failed - View: ${hasViewChannel}, Send: ${hasSendMessages}`);
+        console.warn(`WanderingService: This suggests channel-specific permission overrides are blocking the bot`);
+        return null;
+      }
+    } catch (error) {
+      console.warn(`WanderingService: Error during final permission check for #${selectedChannel.name}:`, error);
       return null;
     }
 

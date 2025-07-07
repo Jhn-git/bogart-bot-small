@@ -63,11 +63,20 @@ async function main() {
   process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
   process.on('SIGINT', () => gracefulShutdown('SIGINT'));
   process.on('uncaughtException', (error) => {
-    console.error('Uncaught Exception:', error);
+    console.error('💥 UNCAUGHT EXCEPTION - This will cause the bot to restart:', error);
+    console.error('Stack trace:', error.stack);
+    console.error('Error name:', error.name);
+    console.error('Error message:', error.message);
     gracefulShutdown('uncaughtException');
   });
   process.on('unhandledRejection', (reason, promise) => {
-    console.error('Unhandled Rejection at:', promise, 'reason:', reason);
+    console.error('💥 UNHANDLED REJECTION - This will cause the bot to restart:', reason);
+    console.error('Promise that was rejected:', promise);
+    if (reason instanceof Error) {
+      console.error('Error stack:', reason.stack);
+      console.error('Error name:', reason.name);
+      console.error('Error message:', reason.message);
+    }
     gracefulShutdown('unhandledRejection');
   });
   try {

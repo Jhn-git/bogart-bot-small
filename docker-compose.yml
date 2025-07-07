@@ -28,8 +28,10 @@ services:
       dockerfile: Dockerfile
       target: production
       cache_from:
-        - node:18-alpine
+        - node:18-slim
         - bogart-bot:latest
+      args:
+        BUILDKIT_INLINE_CACHE: 1
     environment:
       - NODE_ENV=production
       - ENABLE_METRICS=true

@@ -57,6 +57,13 @@ class Container {
     this.registry.set(name, factory);
   }
 
+  // Add a method to directly expose services to the container
+  registerDirectly(name: string, factory: (c: Container) => any) {
+    const service = factory(this);
+    (this as any)[name] = service;
+    return service;
+  }
+
   resolve<T>(name: string): T {
     if (!this.registry.has(name)) throw new Error(`Service not registered: ${name}`);
     return this.registry.get(name)(this);

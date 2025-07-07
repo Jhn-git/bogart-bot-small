@@ -1,14 +1,11 @@
 # Multi-stage Dockerfile for Bogart Discord Bot
 # Stage 1: Dependencies base (for caching)
-FROM node:18-alpine AS deps
+FROM node:18-slim AS deps
 
-# Install build dependencies for native modules like sqlite3
-RUN apk add --no-cache \
+# Install system dependencies for SQLite3 pre-built binaries
+RUN apt-get update && apt-get install -y \
     dumb-init \
-    python3 \
-    make \
-    g++ \
-    libc6-compat
+    && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
@@ -16,20 +13,20 @@ WORKDIR /app
 COPY package*.json .npmrc ./
 
 # Install dependencies in a separate layer for caching
-# Use --ignore-scripts for speed, then rebuild sqlite3 manually
+# Debian has pre-built SQLite3 binaries, much faster than Alpine
 ENV NPM_CONFIG_AUDIT=false NPM_CONFIG_FUND=false NPM_CONFIG_LOGLEVEL=error
-RUN npm ci --only=production --ignore-scripts && \
-    npm rebuild sqlite3 && \
+RUN npm ci --only=production && \
     npm cache clean --force
 
 # Stage 2: Build stage  
-FROM node:18-alpine AS builder
+FROM node:18-slim AS builder
 
-# Install build dependencies
-RUN apk add --no-cache \
+# Install build dependencies only if needed
+RUN apt-get update && apt-get install -y \
     python3 \
     make \
-    g++
+    g++ \
+    && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
@@ -49,10 +46,12 @@ COPY tsconfig.build.json .
 RUN npm run build -- --project tsconfig.build.json
 
 # Stage 3: Production stage
-FROM node:18-alpine AS production
+FROM node:18-slim AS production
 
 # Install dumb-init for proper signal handling
-RUN apk add --no-cache dumb-init
+RUN apt-get update && apt-get install -y \
+    dumb-init \
+    && rm -rf /var/lib/apt/lists/*
 
 # Add metadata
 LABEL maintainer="Bogart Bot Team"
@@ -60,8 +59,8 @@ LABEL description="Bogart Discord Bot - Server companion with organic conversati
 LABEL version="2.0.0"
 
 # Create app user for security
-RUN addgroup -g 1001 -S nodejs && \
-    adduser -S bogart -u 1001
+RUN groupadd -g 1001 nodejs && \
+    useradd -r -u 1001 -g nodejs bogart
 
 # Set working directory
 WORKDIR /app

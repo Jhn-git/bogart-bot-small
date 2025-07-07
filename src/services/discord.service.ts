@@ -104,11 +104,33 @@ export class DiscordService {
   }
 
   public async login(): Promise<void> {
-    try {
-      await this.client.login(this.configService.get('discordToken'));
-    } catch (error) {
-      console.error('Failed to log in:', error);
-      throw error;
+    const maxRetries = 5;
+    let retryCount = 0;
+    
+    while (retryCount < maxRetries) {
+      try {
+        await this.client.login(this.configService.get('discordToken'));
+        if (retryCount > 0) {
+          console.log(`Successfully logged in after ${retryCount} retries`);
+        }
+        return;
+      } catch (error: any) {
+        retryCount++;
+        
+        // Check if it's a DNS resolution error
+        if (error?.code === 'EAI_AGAIN' || error?.message?.includes('getaddrinfo')) {
+          const backoffMs = Math.min(1000 * Math.pow(2, retryCount), 30000);
+          console.error(`DNS resolution failed (attempt ${retryCount}/${maxRetries}). Retrying in ${backoffMs}ms...`);
+          
+          if (retryCount < maxRetries) {
+            await new Promise(resolve => setTimeout(resolve, backoffMs));
+            continue;
+          }
+        }
+        
+        console.error('Failed to log in:', error);
+        throw error;
+      }
     }
   }
 

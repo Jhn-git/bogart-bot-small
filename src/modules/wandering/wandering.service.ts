@@ -91,6 +91,79 @@ export class WanderingService {
   }
 
   /**
+   * Start the wandering service with regular decision cycles
+   */
+  public async start(): Promise<void> {
+    console.log('WanderingService: Starting service...');
+    
+    // Initial startup delay
+    setTimeout(async () => {
+      this.hasStartupDelayPassed = true;
+      console.log('WanderingService: Startup delay completed, service is now active');
+      
+      // Start the decision cycle
+      await this.runDecisionCycle();
+      
+      // Set up regular decision cycles
+      this.decisionCycleInterval = setInterval(async () => {
+        try {
+          await this.runDecisionCycle();
+        } catch (error) {
+          console.error('WanderingService: Error in scheduled decision cycle:', error);
+        }
+      }, DECISION_CYCLE_BASE_INTERVAL);
+      
+      console.log(`WanderingService: Decision cycle scheduled every ${DECISION_CYCLE_BASE_INTERVAL / 60000} minutes`);
+    }, STARTUP_DELAY);
+    
+    // Set up cleanup interval
+    this.cleanupIntervalId = setInterval(() => {
+      this.cleanupExpiredTimestamps();
+    }, TIMESTAMP_CLEANUP_INTERVAL);
+  }
+
+  /**
+   * Stop the wandering service
+   */
+  public async stop(): Promise<void> {
+    console.log('WanderingService: Stopping service...');
+    
+    if (this.decisionCycleInterval) {
+      clearInterval(this.decisionCycleInterval);
+      this.decisionCycleInterval = null;
+    }
+    
+    if (this.cleanupIntervalId) {
+      clearInterval(this.cleanupIntervalId);
+      this.cleanupIntervalId = null;
+    }
+    
+    // Save current cooldowns
+    await this.saveCooldowns();
+    
+    console.log('WanderingService: Service stopped');
+  }
+
+  /**
+   * Clean up expired timestamps
+   */
+  private cleanupExpiredTimestamps(): void {
+    const now = Date.now();
+    let cleanedCount = 0;
+    
+    for (const [guildId, timestamp] of this.lastMessageTimestamps.entries()) {
+      if (now - timestamp > TIMESTAMP_MAX_AGE) {
+        this.lastMessageTimestamps.delete(guildId);
+        cleanedCount++;
+      }
+    }
+    
+    if (cleanedCount > 0) {
+      console.log(`WanderingService: Cleaned up ${cleanedCount} expired timestamps`);
+    }
+  }
+
+  /**
    * Load cooldown timestamps from persistent storage (now using SQLite)
    */
   private async loadCooldowns(): Promise<void> {
@@ -192,6 +265,8 @@ export class WanderingService {
     const lastMessageTime = this.lastMessageTimestamps.get(guild.id) || 0;
     const timeSinceLastMessage = now - lastMessageTime;
     
+    console.log(`WanderingService: Evaluating guild '${guild.name}' (ID: ${guild.id})`);
+    
     // Check if guild is still on cooldown (6 hours)
     if (timeSinceLastMessage < PER_GUILD_RATE_LIMIT_BASE) {
       const remainingMinutes = Math.ceil((PER_GUILD_RATE_LIMIT_BASE - timeSinceLastMessage) / (60 * 1000));
@@ -201,8 +276,10 @@ export class WanderingService {
 
     // Get eligible channels for this guild
     const allEligibleChannels = this.channelDiscoveryService.discoverEligibleChannels(guild);
+    console.log(`WanderingService: Found ${allEligibleChannels.length} eligible channels in ${guild.name}`);
+    
     if (allEligibleChannels.length === 0) {
-      console.log(`WanderingService: No eligible channels in ${guild.name}`);
+      console.log(`WanderingService: No eligible channels in ${guild.name} - skipping`);
       return;
     }
 
@@ -212,19 +289,35 @@ export class WanderingService {
       !channelsOnCooldown.includes(channel.id)
     );
 
+    console.log(`WanderingService: ${channelsOnCooldown.length} channels on cooldown, ${availableChannels.length} available`);
+
     if (availableChannels.length === 0) {
-      console.log(`WanderingService: All channels in ${guild.name} are on cooldown`);
+      console.log(`WanderingService: All channels in ${guild.name} are on cooldown - skipping`);
       return;
     }
 
-    // Simple selection: pick a random available channel
-    const selectedChannel = availableChannels[Math.floor(Math.random() * availableChannels.length)];
-    console.log(`WanderingService: Selected #${selectedChannel.name} from ${availableChannels.length} available channels`);
+    // Calculate scores for available channels
+    const channelScores = await this.calculateChannelScores(availableChannels, guild);
+    
+    // Sort channels by score (highest first)
+    channelScores.sort((a, b) => b.score - a.score);
+    
+    // Log the top 3 channels for transparency
+    console.log(`WanderingService: Channel scoring results for ${guild.name}:`);
+    channelScores.slice(0, 3).forEach((channelScore, index) => {
+      console.log(`  ${index + 1}. #${channelScore.channel.name}: ${channelScore.score.toFixed(1)} points (activity: ${channelScore.activityLevel}, loneliness: +${channelScore.lonelinessBonus.toFixed(1)})`);
+    });
+
+    // Select the highest scoring channel
+    const selectedChannel = channelScores[0].channel;
+    const selectedScore = channelScores[0];
+    
+    console.log(`WanderingService: Selected #${selectedChannel.name} (score: ${selectedScore.score.toFixed(1)}, last message: ${selectedScore.minutesSinceLastMessage}m ago)`);
     
     // Get a random quote
     const quote = this.quoteService.getWanderingMessage(selectedChannel.name);
     if (!quote || quote === '...') {
-      console.log('WanderingService: No quotes available');
+      console.log('WanderingService: No quotes available for selected channel');
       return;
     }
 
@@ -236,10 +329,138 @@ export class WanderingService {
         this.lastMessageTimestamps.set(guild.id, now);
         await this.saveCooldowns();
         await this.db.recordChannelMessage(selectedChannel.id, guild.id);
-        console.log(`WanderingService: Sent message to #${selectedChannel.name} in ${guild.name}`);
+        console.log(`WanderingService: Successfully sent message to #${selectedChannel.name} in ${guild.name}`);
+      } else {
+        console.warn(`WanderingService: Failed to send message to #${selectedChannel.name} in ${guild.name}`);
       }
     } catch (error) {
-      console.error(`WanderingService: Failed to send message to ${guild.name}:`, error);
+      console.error(`WanderingService: Error sending message to ${guild.name}:`, error);
     }
+  }
+
+  /**
+   * Calculate scores for channels using the loneliness prevention algorithm
+   */
+  private async calculateChannelScores(channels: any[], guild: any): Promise<ChannelScore[]> {
+    const scores: ChannelScore[] = [];
+    
+    for (const channel of channels) {
+      try {
+        const score = await this.calculateChannelScore(channel, guild);
+        scores.push(score);
+      } catch (error) {
+        console.error(`WanderingService: Error calculating score for #${channel.name}:`, error);
+      }
+    }
+    
+    return scores;
+  }
+
+  /**
+   * Calculate a single channel's score based on activity, diversity, and loneliness
+   */
+  private async calculateChannelScore(channel: any, guild: any): Promise<ChannelScore> {
+    const now = Date.now();
+    let score = 0;
+    let participantCount = 0;
+    let minutesSinceLastMessage = 0;
+    let botWasRecent = false;
+    let activityLevel: 'high' | 'medium' | 'low' | 'inactive' = 'inactive';
+    let botMessagePercentage = 0;
+    let humanActivityModifier = 1;
+    let lonelinessBonus = 0;
+
+    try {
+      // Fetch recent messages
+      const messages = await channel.messages.fetch({ limit: MESSAGE_HISTORY_COUNT });
+      const recentMessages = messages.filter((msg: any) => now - msg.createdTimestamp < MAX_CHANNEL_INACTIVITY);
+      
+      if (recentMessages.size > 0) {
+        const lastMessage = recentMessages.first();
+        minutesSinceLastMessage = Math.floor((now - lastMessage.createdTimestamp) / (60 * 1000));
+        
+        // Count participants and bot messages
+        const participants = new Set<string>();
+        let botMessages = 0;
+        
+        recentMessages.forEach((msg: any) => {
+          participants.add(msg.author.id);
+          if (msg.author.bot) {
+            botMessages++;
+          }
+        });
+        
+        participantCount = participants.size;
+        botMessagePercentage = (botMessages / recentMessages.size) * 100;
+        botWasRecent = recentMessages.some((msg: any) => 
+          msg.author.id === guild.members.me?.id && 
+          now - msg.createdTimestamp < 2 * 60 * 60 * 1000 // 2 hours
+        );
+        
+        // Determine activity level
+        if (recentMessages.size >= 10) activityLevel = 'high';
+        else if (recentMessages.size >= 5) activityLevel = 'medium';
+        else if (recentMessages.size >= 1) activityLevel = 'low';
+        
+        // Base activity score
+        score += recentMessages.size * 2;
+        
+        // Diversity bonus (more participants = better)
+        score += participantCount * 5;
+        
+        // Human activity modifier (prefer channels with more human activity)
+        if (botMessagePercentage < 50) {
+          humanActivityModifier = 1.5;
+        } else if (botMessagePercentage < 75) {
+          humanActivityModifier = 1.2;
+        } else {
+          humanActivityModifier = 0.8;
+        }
+        
+        // Loneliness bonus (prefer channels that haven't been active recently)
+        if (minutesSinceLastMessage > 360) { // 6 hours
+          lonelinessBonus = 30;
+        } else if (minutesSinceLastMessage > 180) { // 3 hours
+          lonelinessBonus = 15;
+        } else if (minutesSinceLastMessage > 60) { // 1 hour
+          lonelinessBonus = 5;
+        }
+        
+        // Avoid recently bot-active channels
+        if (botWasRecent) {
+          score *= 0.5;
+        }
+        
+      } else {
+        // Very inactive channel - still gets some loneliness bonus
+        minutesSinceLastMessage = 1440; // 24 hours placeholder
+        lonelinessBonus = 20;
+      }
+      
+      // Apply modifiers
+      score *= humanActivityModifier;
+      score += lonelinessBonus;
+      
+      // Ensure minimum score
+      score = Math.max(score, 1);
+      
+    } catch (error) {
+      console.error(`WanderingService: Error analyzing channel #${channel.name}:`, error);
+      score = 1; // Fallback score
+    }
+
+    return {
+      channel,
+      guildId: guild.id,
+      guildName: guild.name,
+      score,
+      participantCount,
+      minutesSinceLastMessage,
+      botWasRecent,
+      activityLevel,
+      botMessagePercentage,
+      humanActivityModifier,
+      lonelinessBonus
+    };
   }
 }

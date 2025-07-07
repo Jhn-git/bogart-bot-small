@@ -50,7 +50,7 @@ export class DatabaseService {
 
   get(query: string, params: any[] = []): Promise<any> {
     return new Promise((resolve, reject) => {
-      this.db.get(query, params, (err, row) => {
+      this.db.get(query, params, (err: Error | null, row: any) => {
         if (err) reject(err);
         else resolve(row);
       });
@@ -59,7 +59,7 @@ export class DatabaseService {
 
   all(query: string, params: any[] = []): Promise<any[]> {
     return new Promise((resolve, reject) => {
-      this.db.all(query, params, (err, rows) => {
+      this.db.all(query, params, (err: Error | null, rows: any[]) => {
         if (err) reject(err);
         else resolve(rows);
       });
@@ -68,7 +68,7 @@ export class DatabaseService {
 
   run(query: string, params: any[] = []): Promise<void> {
     return new Promise((resolve, reject) => {
-      this.db.run(query, params, (err) => {
+      this.db.run(query, params, (err: Error | null) => {
         if (err) reject(err);
         else resolve();
       });
@@ -77,7 +77,7 @@ export class DatabaseService {
 
   exec(query: string): Promise<void> {
     return new Promise((resolve, reject) => {
-      this.db.exec(query, (err) => {
+      this.db.exec(query, (err: Error | null) => {
         if (err) reject(err);
         else resolve();
       });

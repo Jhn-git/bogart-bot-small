@@ -7,10 +7,10 @@ export class StatusService {
   private isGoblinMessageActive: boolean = false;
   private lastGoblinMessageIndex: number = -1;
   
-  // Rotation settings
-  private readonly ROTATION_INTERVAL_MS = 12 * 60 * 1000; // 12 minutes
-  private readonly GOBLIN_MESSAGE_PROBABILITY = 0.2; // 20% chance
-  private readonly GOBLIN_MESSAGE_DURATION = 3 * 60 * 1000; // 3 minutes
+  // Rotation settings - reduced frequency to minimize noise
+  private readonly ROTATION_INTERVAL_MS = 2 * 60 * 60 * 1000; // 2 hours (was 12 minutes)
+  private readonly GOBLIN_MESSAGE_PROBABILITY = 0.15; // 15% chance (was 20%)
+  private readonly GOBLIN_MESSAGE_DURATION = 20 * 60 * 1000; // 20 minutes (was 3 minutes)
   
   // Goblin message templates (will include server count)
   private readonly goblinMessages = [
@@ -90,7 +90,7 @@ export class StatusService {
   private returnToServerCountStatus(): void {
     this.isGoblinMessageActive = false;
     this.updateServerCountStatus();
-    console.log('StatusService: Returned to server count status');
+    // Reduced logging verbosity - only log when important
   }
 
   private updateServerCountStatus(): void {
@@ -123,7 +123,10 @@ export class StatusService {
       const client = this.discordService.getClient();
       if (client.user) {
         client.user.setActivity(message, { type });
-        console.log(`StatusService: Status set to "${message}"`);
+        // Only log status changes when they're meaningful (goblin messages or errors)
+        if (type === ActivityType.Playing) {
+          console.log(`StatusService: Status set to "${message}"`);
+        }
       } else {
         console.warn('StatusService: Client user not available for status update');
       }

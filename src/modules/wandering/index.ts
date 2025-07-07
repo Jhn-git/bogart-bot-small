@@ -1,16 +1,22 @@
 import { WanderingService } from './wandering.service';
 
-export function initialize(container: any) {
-  // Register the WanderingService with the DI container
-  container.register('wanderingService', (c: any) =>
-    new WanderingService(
-      c.resolve('databaseService'),
-      c.resolve('quoteService'),
-      c.resolve('guildService'),
-      c.resolve('channelDiscoveryService'),
-      c.resolve('configService')
-    )
+export async function initialize(container: any) {
+  console.log('WanderingModule: Initializing...');
+  
+  // Create and register the WanderingService
+  const wanderingService = new WanderingService(
+    container.databaseService,
+    container.quoteService,
+    container.guildService,
+    container.channelDiscoveryService,
+    container.configService
   );
-  // Optionally, you can start the service here if needed:
-  // c.resolve('wanderingService').start();
+  
+  // Store it in the container for access
+  container.wanderingService = wanderingService;
+  
+  // Start the service
+  await wanderingService.start();
+  
+  console.log('WanderingModule: Initialized and started successfully');
 }

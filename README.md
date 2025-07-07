@@ -61,6 +61,26 @@ docker-compose up bogart-bot-dev --build
 docker-compose up bogart-bot --build -d
 ```
 
+## Required Permissions
+
+For Bogart to function properly, the bot requires the following Discord permissions in channels where it should post messages:
+
+### Essential Permissions
+- **View Channels** - Required to see text channels
+- **Send Messages** - Required to post wandering messages  
+- **Read Message History** - Required to analyze channel activity for scoring
+
+### Optional Permissions  
+- **Manage Messages** - Only required if using the message cleanup feature (`npm run cleanup`)
+
+### Setting Up Permissions
+
+1. **Server-wide permissions**: When inviting the bot, ensure it has the essential permissions listed above
+2. **Channel-specific permissions**: The bot will automatically skip channels where it lacks the required permissions
+3. **Permission changes**: If permissions are revoked after setup, the bot will gracefully skip affected channels and log the issue
+
+**Note**: Bogart intelligently filters channels based on permissions during operation, so no manual configuration is needed. Channels without proper permissions are automatically excluded from messaging cycles.
+
 ## Deployment
 
 ### Docker Deployment

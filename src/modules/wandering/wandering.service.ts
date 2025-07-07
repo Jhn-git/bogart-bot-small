@@ -32,7 +32,7 @@ interface GuildBatch {
   totalBatches: number;
 }
 
-const DECISION_CYCLE_BASE_INTERVAL = (parseInt(process.env.DECISION_CYCLE_MINUTES || '45', 10)) * 60 * 1000;
+const DECISION_CYCLE_BASE_INTERVAL = (parseInt(process.env.DECISION_CYCLE_MINUTES || '720', 10)) * 60 * 1000; // 12 hours default
 const DECISION_CYCLE_JITTER_PERCENT = 20;
 const STARTUP_DELAY = 2 * 60 * 1000;
 const PER_GUILD_RATE_LIMIT_BASE = 6 * 60 * 60 * 1000;
